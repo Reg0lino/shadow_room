@@ -1,23 +1,8 @@
-```markdown
-+-----------------------------------------------------------------------------+
-|   #####   ####  #####  ####   ####  #   #  ####    ###   ####  ##### ####   |
-|   #    # #    # #    # #   # #    # ## ## #         #   #    # #     #   #  |
-|   #####  #    # #    # #   # #    # # # #  ####     #   #    # ####  #   #  |
-|   #    # #    # #    # #   # #    # #   #      #    #   #    # #     #   #  |
-|   #####   ####  #####  ####   ####  #   #  ####     #    ####  ##### ####   |
+
 +-----------------------------------------------------------------------------+
 |      A Cyber-Assisted 3D Object & Shadow Viewer for Art Reference           |
 +-----------------------------------------------------------------------------+
 
-        _.--""--._
-      .'          `.
-     /   O      O   \
-    |    \  ^^  /    |      <-- Your Digital Art Sidekick!
-    \     `----'     /
-     `. _______ .'
-       //_____\\
-      (( ____ ))
-       `--""--'
 
 
 ===============================================================================
@@ -146,7 +131,7 @@ those using folders starting with underscores (like `_` which Jekyll ignores).
 This project is likely intended to be open and shared. Consider adding a
 standard open-source license. The MIT license is a common permissive choice:
 
-```text
+```
 MIT License
 
 Copyright (c) [Year] [Your Name/Handle]
