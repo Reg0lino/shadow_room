@@ -20,7 +20,7 @@ painting, and understanding form.
 This project is currently **UNDER ACTIVE DEVELOPMENT**. It's being built using
 a unique "vibecoding" approach – a blend of intuition, experimentation, and
 iterative refinement guided by natural language interaction with Google's
-Gemini 1.5 AI model, all orchestrated within the Cursor code editor. It's
+Gemini 2.5 AI model, all orchestrated within the Cursor code editor. It's
 less about traditional programming paths and more about exploring possibilities
 through dialogue.
 
@@ -33,8 +33,8 @@ through dialogue.
 
      > ============================================================ <
      >
-     >           ### PASTE-YOUR-GITHUB-PAGES-LINK-HERE ###
-     >           (Replace this line with your live URL!)
+     >           ### https://reg0lino.github.io/shadow_room/ ###
+     >           
      >
      > ============================================================ <
 
@@ -72,7 +72,6 @@ through dialogue.
   * Framework: Three.js (The magic behind the 3D)
   * Language: JavaScript (ES Modules)
   * Styling: CSS3
-  * AI Partner: Google Gemini 1.5 Pro (Via API / Integrated Environment)
   * Editor: Cursor (AI-first Code Editor based on VS Code)
   * Development Method: "Vibecoding" / Iterative Natural Language Prompting
   * Hosting: GitHub Pages
