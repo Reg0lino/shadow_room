@@ -1,0 +1,296 @@
+/* --- Dark Mode Theme & Base Styles --- */
+:root {
+    --bg-dark-main: #1a1a1a;
+    --bg-dark-controls: #2a2a2a;
+    --text-light: #e0e0e0;
+    --text-label-pink: #ff80cc; /* Bright Pink */
+    --text-heading-purple: #c080ff; /* Bright Purple */
+    --border-dark: #444;
+    --control-bg-dark: #333;
+    --control-border-dark: #555;
+    --button-bg: #4a4a4a;
+    --button-border: #666;
+    --button-hover-bg: #5a5a5a;
+    --debug-bg: #303030;
+    --debug-text: #a0a0a0;
+    --debug-error-text: #ff8080;
+    --debug-success-text: #80ff80; /* Green for success */
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%; /* Use 100% for HTML */
+    width: 100%;
+    overflow: hidden;
+    font-family: sans-serif;
+    background-color: var(--bg-dark-main);
+    color: var(--text-light);
+}
+
+body {
+    display: flex;
+    /* Default: Portrait Layout */
+    flex-direction: column;
+    height: 100vh; /* Use vh for body to ensure viewport height */
+    width: 100vw;
+    transition: flex-direction 0s; /* Don't transition flex-direction */
+}
+
+#scene-container {
+    flex: 1 1 auto; /* Allow shrinking/growing, take up available space */
+    position: relative;
+    background-color: var(--bg-dark-main);
+    touch-action: none;
+    cursor: grab;
+    /* Crucial for flex shrinking */
+    min-height: 0;
+    min-width: 0;
+    transition: background-color 0.1s ease-out;
+}
+#scene-container:active { cursor: grabbing; }
+
+#controls-container {
+    /* Default: Portrait Layout (Bottom) */
+    flex: 0 0 auto; /* Don't grow or shrink, size based on height/max-height */
+    height: 50%; /* Default expanded height */
+    max-height: 50%; /* Explicit max-height */
+    background-color: var(--bg-dark-controls);
+    padding: 0 15px 10px 15px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--border-dark);
+    position: relative; /* Needed for sticky header */
+    /* Smooth transitions for size changes */
+    transition: height 0.3s ease-out, max-height 0.3s ease-out, padding 0.3s ease-out, border-color 0.3s ease-out;
+    /* Explicitly prevent growing/shrinking beyond basis in column mode */
+    min-height: 0; /* Allow shrinking if needed, but controlled by height/max-height */
+}
+
+/* Header for sticky button */
+#controls-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--bg-dark-controls);
+    padding: 10px 15px 5px 15px; /* Adjusted padding */
+    margin: 0 -15px 5px -15px; /* Adjust margin to match padding */
+    border-bottom: 1px solid var(--border-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 25px;
+    box-sizing: content-box; /* Ensure padding doesn't affect width calc */
+}
+
+#controls-header-left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#toggleControlsBtn, #cameraLockBtn, #saveStateBtn, #loadStateBtn, #resetSceneBtn {
+    /* Common button styles */
+    padding: 4px 8px;
+    font-size: 0.8em;
+    cursor: pointer;
+    background-color: var(--button-bg);
+    color: var(--text-light);
+    border: 1px solid var(--button-border);
+    border-radius: 3px;
+    white-space: nowrap;
+}
+#toggleControlsBtn:hover, #cameraLockBtn:hover, #saveStateBtn:hover, #loadStateBtn:hover, #resetSceneBtn:hover {
+    background-color: var(--button-hover-bg);
+}
+
+/* --- Collapse/Expand Styles (Portrait Default) --- */
+body.controls-collapsed #controls-container {
+    height: 35px; /* Fixed height when collapsed */
+    max-height: 35px;
+    min-height: 35px; /* Explicit min-height */
+    overflow: hidden;
+    padding: 0 15px; /* Keep padding for header alignment */
+    border-top: none;
+}
+body.controls-collapsed #controls-header {
+     padding-top: 5px;
+     padding-bottom: 5px;
+     margin-bottom: 0;
+     margin-left: -15px; /* Align with container padding removal */
+     margin-right: -15px;
+     border-bottom: none;
+ }
+/* Scene container takes up remaining space naturally via flex: 1 1 auto */
+body.controls-collapsed #controls-container > *:not(#controls-header) {
+    display: none;
+}
+
+
+/* --- Control Element Styling (Dark Mode) --- */
+h3, hr, .control-group, #search-container, #view-options {
+     clear: both;
+ }
+#search-container {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 5px; margin-top: 5px;
+}
+#shapeSearch {
+    flex-grow: 1; padding: 6px; background-color: var(--control-bg-dark); color: var(--text-light); border: 1px solid var(--control-border-dark); border-radius: 3px; font-size: 0.9em;
+}
+#refreshShapeListBtn {
+    padding: 5px 8px; font-size: 1em; cursor: pointer; background-color: var(--button-bg); color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px; line-height: 1; flex-shrink: 0;
+}
+#refreshShapeListBtn:hover { background-color: var(--button-hover-bg); }
+.control-group {
+    display: flex; align-items: center; gap: 10px; min-height: 30px;
+}
+.control-group label {
+    flex-basis: 80px; flex-shrink: 0; text-align: right; font-size: 0.85em; color: var(--text-label-pink);
+}
+.control-group input[type="range"] {
+    flex-grow: 1; cursor: pointer; min-width: 50px; height: 18px; accent-color: var(--text-label-pink);
+}
+.control-group span {
+    min-width: 40px; flex-shrink: 0; text-align: right; font-family: monospace; font-size: 0.85em; background-color: var(--control-bg-dark); color: var(--text-light); padding: 2px 4px; border-radius: 3px; border: 1px solid var(--control-border-dark);
+}
+ .control-group select {
+    flex-grow: 1; padding: 5px; background-color: var(--control-bg-dark); color: var(--text-light); border: 1px solid var(--control-border-dark); border-radius: 3px; min-width: 100px; appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23CCCCCC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat; background-position: right 10px top 50%; background-size: .65em auto; padding-right: 30px;
+ }
+select#shapeSelect option { font-size: 0.9em; }
+.reset-slider-btn {
+    background: none; border: none; color: var(--text-label-pink); font-size: 1.1em; padding: 0 5px; margin-left: 2px; cursor: pointer; line-height: 1; opacity: 0.7; transition: opacity 0.2s ease; align-self: center; flex-shrink: 0;
+}
+.reset-slider-btn:hover { opacity: 1.0; }
+#resetObjectBtn {
+     padding: 4px 10px; font-size: 0.8em; cursor: pointer; background-color: var(--button-bg); color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px; margin-top: 8px; margin-bottom: 8px; display: block; margin-left: auto; margin-right: auto; width: fit-content;
+}
+ #resetObjectBtn:hover { background-color: var(--button-hover-bg); }
+#view-options {
+    display: flex; gap: 10px; align-items: center; font-size: 0.8em; margin: 0;
+}
+ #view-options label {
+     color: var(--text-label-pink); cursor: pointer; white-space: nowrap;
+ }
+ #view-options input[type="checkbox"] {
+      cursor: pointer; accent-color: var(--text-label-pink); margin-right: 2px; transform: scale(0.9);
+  }
+h3 {
+    margin: 15px 0 8px 0; text-align: center; font-weight: normal; font-size: 1.0em; color: var(--text-heading-purple); border-bottom: 1px solid var(--border-dark); padding-bottom: 4px;
+}
+hr {
+    border: none; border-top: 1px solid var(--border-dark); margin: 10px 0; width: 90%; margin-left: auto; margin-right: auto;
+}
+
+/* --- Debug Console Styles (Integrated) --- */
+#debug-console-container {
+    position: relative; width: auto; margin-top: 15px; max-height: 150px; background-color: var(--debug-bg); border: 1px solid var(--border-dark); z-index: 10; display: flex; flex-direction: column; border-radius: 3px;
+}
+#debug-console {
+    flex-grow: 1; overflow-y: auto; padding: 5px; font-family: monospace; font-size: 0.7em; color: var(--debug-text); line-height: 1.3;
+}
+#debug-console p {
+    margin: 0 0 2px 0; padding: 0; white-space: pre-wrap; word-break: break-all;
+}
+#debug-console .error { color: var(--debug-error-text); font-weight: bold; }
+#debug-console .success { color: var(--debug-success-text); font-weight: bold;}
+#debug-console-footer {
+    padding: 3px 5px; text-align: right; flex-shrink: 0; border-top: 1px solid var(--border-dark);
+}
+#copyLogBtn {
+    font-size: 0.7em; padding: 2px 5px; background-color: var(--button-bg); color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px; cursor: pointer;
+}
+#copyLogBtn:hover { background-color: var(--button-hover-bg); }
+
+
+/* ====================================================== */
+/* --- Landscape Layout (Sidebar on Right) --- */
+/* ====================================================== */
+/* Apply when orientation is landscape AND min-width is reasonable */
+@media screen and (orientation: landscape) and (min-width: 768px) {
+
+    body {
+        flex-direction: row; /* Scene first, then controls */
+    }
+
+    #scene-container {
+        /* Already flex: 1 1 auto; min-width: 0; */
+        height: 100%; /* Ensure full height */
+        min-height: initial; /* Override base min-height */
+    }
+
+    #controls-container {
+        /* Sidebar sizing - Non-flexible width */
+        flex: none; /* Disable flex grow/shrink */
+        width: 380px; /* Explicit width */
+        height: 100%; /* Fill full height */
+        max-height: 100%; /* Override portrait max-height */
+        min-height: initial; /* Override base min-height */
+
+        /* Corrected border placement for right sidebar */
+        border-top: none;
+        border-left: 1px solid var(--border-dark);
+        border-right: none;
+
+        /* Padding and overflow */
+        padding: 0 10px 15px 10px;
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        /* Transition width */
+        transition: width 0.3s ease-out, padding 0.3s ease-out, border-color 0.3s ease-out;
+    }
+
+
+    /* Adjustments for the sticky header in sidebar mode */
+    #controls-header {
+        margin: 0 -10px 5px -10px; /* Match new padding */
+        padding-left: 10px;
+        padding-right: 10px;
+        border-bottom: 1px solid var(--border-dark);
+    }
+
+    /* --- Collapsed State in Landscape --- */
+    body.controls-collapsed #controls-container {
+        width: 45px; /* Collapsed width */
+        min-width: 45px; /* Ensure it doesn't go smaller */
+        overflow: hidden;
+        padding: 0;
+        border-left: 1px solid var(--border-dark);
+        /* Override other properties set in base collapsed state if needed */
+        height: 100%;
+        max-height: 100%;
+        min-height: initial;
+    }
+
+    /* Scene takes remaining space automatically */
+
+    /* Hide most header content when collapsed in landscape */
+    body.controls-collapsed #controls-header {
+        padding: 5px;
+        margin: 0;
+        border-bottom: none;
+        justify-content: center;
+    }
+    body.controls-collapsed #controls-header > *:not(#toggleControlsBtn) {
+         display: none;
+    }
+    body.controls-collapsed #toggleControlsBtn {
+       /* Optional styling */
+    }
+
+}
+
+/* --- ADD Specific Style for Reset Button --- */
+#resetSceneBtn {
+    padding: 2px 5px; /* Smaller padding */
+    font-size: 1.1em;  /* Slightly larger icon */
+    line-height: 1;   /* Adjust line height for vertical centering */
+    /* Override any flex settings if needed, but likely okay */
+}

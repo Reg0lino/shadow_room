@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3JS Dynamic Pose Explorer - Refactored</title> <!-- Simplified Title -->
+
+    <!-- Link to the external CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Import Map (Keep this in the HTML head) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@latest/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@latest/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+<body>
+
+    <div id="scene-container"></div>
+
+    <div id="controls-container">
+        <!-- Sticky Header -->
+        <div id="controls-header">
+             <div id="controls-header-left">
+                 <button id="cameraLockBtn">Lock Camera</button>
+                 <!-- View Options Checkboxes -->
+                 <div id="view-options">
+                     <input type="checkbox" id="gridHelperToggle"> <label for="gridHelperToggle">Grid</label>
+                     <input type="checkbox" id="axesHelperToggle"> <label for="axesHelperToggle">Axes</label>
+                 </div>
+                 <!-- Save/Load/Reset Buttons -->
+                 <button id="saveStateBtn">Save State</button>
+                 <button id="loadStateBtn">Load State</button>
+                 <button id="resetSceneBtn" title="Reset Scene to Default">🔄</button>
+             </div>
+             <button id="toggleControlsBtn">Collapse</button>
+        </div>
+
+        <!-- Scrollable Controls Start Here -->
+
+        <h3>Light (SpotLight)</h3>
+         <div class="control-group">
+            <label for="lightIntensity">Intensity:</label>
+            <input type="range" id="lightIntensity" min="0.1" max="5.0" value="1.8" step="0.1">
+            <span id="lightIntensityValue">1.8</span>
+             <button class="reset-slider-btn" data-target-slider="lightIntensity" data-reset-value="1.8" title="Reset Intensity">🔄</button>
+        </div>
+         <div class="control-group">
+            <label for="lightAngle">Angle:</label>
+            <input type="range" id="lightAngle" min="5" max="90" value="45" step="1">
+            <span id="lightAngleValue">45&deg;</span>
+             <button class="reset-slider-btn" data-target-slider="lightAngle" data-reset-value="45" title="Reset Angle">🔄</button>
+        </div>
+         <div class="control-group">
+            <label for="lightPenumbra">Penumbra:</label>
+            <input type="range" id="lightPenumbra" min="0" max="1" value="0.2" step="0.05">
+            <span id="lightPenumbraValue">0.20</span>
+             <button class="reset-slider-btn" data-target-slider="lightPenumbra" data-reset-value="0.2" title="Reset Penumbra">🔄</button>
+        </div>
+        <hr>
+        <!-- Light Pos Y first -->
+        <div class="control-group">
+            <label for="lightY">Pos Y:</label>
+            <input type="range" id="lightY" min="1" max="20" value="10" step="0.1">
+            <span id="lightYValue">10.0</span>
+             <button class="reset-slider-btn" data-target-slider="lightY" data-reset-value="10" title="Reset Light Y">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="lightX">Pos X:</label>
+            <input type="range" id="lightX" min="-15" max="15" value="0" step="0.1">
+            <span id="lightXValue">0.0</span>
+             <button class="reset-slider-btn" data-target-slider="lightX" data-reset-value="0" title="Reset Light X">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="lightZ">Pos Z:</label>
+            <input type="range" id="lightZ" min="-15" max="15" value="0" step="0.1">
+            <span id="lightZValue">0.0</span>
+             <button class="reset-slider-btn" data-target-slider="lightZ" data-reset-value="0" title="Reset Light Z">🔄</button>
+        </div>
+        <hr>
+
+         <h3>Object</h3>
+          <!-- Type Select -->
+         <div class="control-group">
+            <label for="shapeSelect">Type:</label>
+            <select id="shapeSelect">
+                 <optgroup label="Primitives">
+                    <option value="sphere" selected>Sphere</option>
+                    <option value="cube">Cube</option>
+                    <option value="cylinder">Cylinder</option>
+                    <option value="torus">Torus</option>
+                    <option value="cone">Cone</option>
+                    <option value="capsule">Capsule</option>
+                    <option value="dodecahedron">Dodecahedron</option>
+                    <option value="icosahedron">Icosahedron</option>
+                    <option value="octahedron">Octahedron</option>
+                    <option value="tetrahedron">Tetrahedron</option>
+                    <option value="pyramid">Pyramid (Cone)</option>
+                </optgroup>
+                 <optgroup label="Wireframe Inspirations">
+                    <option value="wireframe_cube">Wireframe Cube</option>
+                    <option value="wireframe_sphere">Wireframe Sphere</option>
+                    <option value="wireframe_torus">Wireframe Torus</option>
+                    <option value="wireframe_icosahedron">Wireframe Icosahedron</option>
+                    <option value="wireframe_stacked_cubes">Wireframe Stacked Cubes</option>
+                    <option value="wireframe_simple_person">Wireframe Simple Person</option>
+                    <option value="wireframe_abstract_sculpture_1">Wireframe Torus Knot</option>
+                    <option value="wireframe_rocket_basic">Wireframe Rocket</option>
+                    <option value="wireframe_simple_car">Wireframe Simple Car</option>
+                    <option value="wireframe_person_running">Wireframe Person Running</option>
+                    <option value="wireframe_basic_dog">Wireframe Basic Dog</option>
+                    <option value="wireframe_basic_cat">Wireframe Basic Cat</option>
+                    <option value="wireframe_table_chair">Wireframe Table & Chair</option>
+                    <option value="wireframe_simple_tree">Wireframe Simple Tree</option>
+                    <option value="wireframe_lamp_simple">Wireframe Lamp</option>
+                    <option value="wireframe_plant_pot">Wireframe Plant Pot</option>
+                    <option value="wireframe_archway">Wireframe Archway</option>
+                 </optgroup>
+                <optgroup label="Variations">
+                    <option value="tall_box">Tall Box</option>
+                    <option value="flat_box">Flat Box</option>
+                    <option value="thin_cylinder">Thin Cylinder</option>
+                    <option value="thick_torus">Thick Torus</option>
+                    <option value="thin_torus">Thin Torus</option>
+                    <option value="squashed_sphere">Squashed Sphere</option>
+                    <option value="stretched_cube">Stretched Cube</option>
+                    <option value="lowpoly_sphere">Low-Poly Sphere</option>
+                    <option value="open_cylinder">Open Cylinder</option>
+                    <option value="half_sphere">Half Sphere</option>
+                </optgroup>
+                 <optgroup label="Basic Combinations">
+                    <option value="stacked_cubes">Stacked Cubes</option>
+                    <option value="stacked_cylinders">Stacked Cylinders</option>
+                    <option value="stacked_spheres">Stacked Spheres</option>
+                    <option value="stacked_tori">Stacked Tori</option>
+                    <option value="sphere_on_cube">Sphere on Cube</option>
+                    <option value="cube_on_sphere">Cube on Sphere</option>
+                    <option value="cone_on_cylinder">Cone on Cylinder</option>
+                    <option value="offset_cubes">Offset Cubes</option>
+                    <option value="offset_spheres">Offset Spheres</option>
+                    <option value="offset_capsules">Offset Capsules</option>
+                    <option value="cube_pyramid_stack">Cube+Pyramid Stack</option>
+                    <option value="three_spheres_line">Three Spheres Line</option>
+                    <option value="three_cubes_line">Three Cubes Line</option>
+                    <option value="three_spheres_triangle">Three Spheres Triangle</option>
+                    <option value="three_cubes_triangle">Three Cubes Triangle</option>
+                    <option value="linked_tori">Linked Tori</option>
+                    <option value="intersecting_cube_sphere">Intersecting Cube/Sphere</option>
+                    <option value="intersecting_cylinders">Intersecting Cylinders</option>
+                    <option value="intersecting_tori">Intersecting Tori</option>
+                    <option value="cylinder_thru_torus">Cylinder Through Torus</option>
+                    <option value="sphere_thru_torus">Sphere Through Torus</option>
+                    <option value="cube_thru_torus">Cube Through Torus</option>
+                </optgroup>
+                <optgroup label="Separated Combinations">
+                    <option value="two_cubes_apart">Two Cubes Apart</option>
+                    <option value="two_spheres_apart">Two Spheres Apart</option>
+                    <option value="sphere_cube_apart">Sphere & Cube Apart</option>
+                    <option value="four_corners_cubes">Four Corners Cubes</option>
+                    <option value="line_of_cubes">Line of Cubes</option>
+                </optgroup>
+                 <optgroup label="Rings & Arrays">
+                     <option value="box_with_poles">Box with Poles</option>
+                     <option value="cylinder_ring">Cylinder Ring</option>
+                     <option value="sphere_ring">Sphere Ring</option>
+                     <option value="cube_ring">Cube Ring</option>
+                     <option value="cube_grid_flat">Cube Grid (Flat)</option>
+                     <option value="sphere_grid_flat">Sphere Grid (Flat)</option>
+                     <option value="random_cubes_cluster">Random Cubes Cluster</option>
+                     <option value="random_spheres_cluster">Random Spheres Cluster</option>
+                     <option value="random_mixed_cluster">Random Mixed Cluster</option>
+                </optgroup>
+                 <optgroup label="Static Figures">
+                    <option value="snowman">Snowman</option>
+                    <option value="simple_person">Simple Person (Capsules)</option>
+                    <option value="person_box">Person (Boxes)</option>
+                    <option value="person_spheres">Person (Spheres)</option>
+                    <option value="person_mixed">Person (Mixed)</option>
+                    <option value="person_abstract">Person (Abstract)</option>
+                    <option value="basic_robot">Basic Robot</option>
+                    <option value="basic_dog">Basic Dog</option>
+                    <option value="basic_cat">Basic Cat</option>
+                 </optgroup>
+                 <optgroup label="Dynamic People Poses">
+                    <option value="person_running">Person Running</option>
+                    <option value="person_jumping">Person Jumping</option>
+                    <option value="person_sitting">Person Sitting</option>
+                    <option value="person_waving">Person Waving</option>
+                    <option value="person_reaching">Person Reaching</option>
+                    <option value="person_fighting_stance">Person Fighting Stance</option>
+                    <option value="person_yoga_tree">Person Yoga (Tree)</option>
+                    <option value="person_thinking">Person Thinking</option>
+                    <option value="person_dancing_1">Person Dancing 1</option>
+                    <option value="person_dancing_2">Person Dancing 2</option>
+                    <option value="person_kneeling">Person Kneeling</option>
+                    <option value="person_lying_down">Person Lying Down</option>
+                    <option value="person_pointing">Person Pointing</option>
+                    <option value="person_superhero_pose">Person Superhero Pose</option>
+                    <option value="person_walking">Person Walking</option>
+                    <option value="person_cartwheel_prep">Person Cartwheel Prep</option>
+                    <option value="person_pushup">Person Pushup</option>
+                    <option value="person_reading_seated">Person Reading Seated</option>
+                    <option value="person_shrugging">Person Shrugging</option>
+                    <option value="person_bowing">Person Bowing</option>
+                    <option value="person_tiptoe">Person Tiptoe</option>
+                    <option value="person_carrying_box">Person Carrying Box</option>
+                    <option value="person_looking_up">Person Looking Up</option>
+                    <option value="person_crouching">Person Crouching</option>
+                    <option value="person_balancing_one_leg">Person Balancing One Leg</option>
+                 </optgroup>
+                  <optgroup label="Dynamic Animal Poses">
+                    <option value="dog_running">Dog Running</option>
+                    <option value="dog_sitting">Dog Sitting</option>
+                    <option value="dog_playing_bow">Dog Playing (Bow)</option>
+                    <option value="dog_begging">Dog Begging</option>
+                    <option value="dog_lying_down">Dog Lying Down</option>
+                    <option value="cat_stretching">Cat Stretching</option>
+                    <option value="cat_playing">Cat Playing (Pounce)</option>
+                    <option value="cat_sleeping_curled">Cat Sleeping (Curled)</option>
+                    <option value="cat_walking_tail_up">Cat Walking (Tail Up)</option>
+                    <option value="cat_crouching_low">Cat Crouching Low</option>
+                    <option value="bird_flying">Bird Flying</option>
+                    <option value="bird_perched">Bird Perched</option>
+                    <option value="bird_taking_off">Bird Taking Off</option>
+                    <option value="bird_pecking">Bird Pecking</option>
+                    <option value="bird_wings_folded">Bird Wings Folded</option>
+                    <option value="horse_galloping">Horse Galloping</option>
+                    <option value="horse_rearing">Horse Rearing</option>
+                    <option value="horse_trotting">Horse Trotting</option>
+                    <option value="horse_grazing">Horse Grazing</option>
+                    <option value="horse_standing">Horse Standing</option>
+                    <option value="fish_swimming">Fish Swimming</option>
+                    <option value="snake_coiled">Snake Coiled</option>
+                    <option value="snake_slithering">Snake Slithering</option>
+                    <option value="frog_jumping">Frog Jumping</option>
+                    <option value="deer_leaping">Deer Leaping</option>
+                    <option value="elephant_walking">Elephant Walking</option>
+                    <option value="monkey_hanging">Monkey Hanging</option>
+                    <option value="bear_standing">Bear Standing</option>
+                    <option value="bear_walking_4legs">Bear Walking 4 Legs</option>
+                    <option value="rabbit_sitting">Rabbit Sitting</option>
+                 </optgroup>
+                 <optgroup label="Objects">
+                    <option value="table_chair">Table & Chair</option>
+                    <option value="archway">Archway</option>
+                    <option value="simple_house">Simple House</option>
+                    <option value="dumbbell">Dumbbell</option>
+                    <option value="mushroom">Mushroom</option>
+                    <option value="simple_tree">Simple Tree</option>
+                    <option value="stylized_tree">Stylized Tree (Cones)</option>
+                    <option value="rocket_basic">Basic Rocket</option>
+                    <option value="lamp_simple">Simple Lamp</option>
+                    <option value="bridge_simple">Simple Bridge</option>
+                    <option value="simple_car">Simple Car</option>
+                    <option value="bench_simple">Simple Bench</option>
+                    <option value="tower_basic">Basic Tower</option>
+                    <option value="stairs_simple">Simple Stairs</option>
+                    <option value="plant_pot">Plant in Pot</option>
+                </optgroup>
+                 <optgroup label="Abstract & Sculptures">
+                    <option value="leaning_tower_cubes">Leaning Tower (Cubes)</option>
+                    <option value="spiral_cubes">Spiral Cubes</option>
+                    <option value="spiral_spheres">Spiral Spheres</option>
+                    <option value="abstract_sculpture_1">Abstract Sculpture 1 (Knot)</option>
+                    <option value="abstract_sculpture_2">Abstract Sculpture 2 (Mixed)</option>
+                    <option value="abstract_sculpture_3">Abstract Sculpture 3 (Planes)</option>
+                    <option value="abstract_sculpture_4">Abstract Sculpture 4 (Stacked Rings)</option>
+                    <option value="saturn_like">Saturn-like</option>
+                    <option value="wireframe_cube_nested">Wireframe Cube Nested</option>
+                    <option value="wireframe_icosahedron_in_sphere">Icosahedron in Sphere (Wire)</option>
+                </optgroup>
+            </select>
+        </div>
+         <!-- Search Container -->
+         <div id="search-container">
+            <input type="search" id="shapeSearch" placeholder="Search shapes...">
+            <button id="refreshShapeListBtn" title="Refresh List">🔄</button>
+         </div>
+         <!-- Reset Object Button -->
+         <button id="resetObjectBtn">Reset Object</button>
+
+         <!-- Object Transform & Material Controls -->
+        <div class="control-group">
+            <label for="modelYOffset">Y Offset:</label>
+            <input type="range" id="modelYOffset" min="-2" max="5" value="0" step="0.1">
+            <span id="modelYOffsetValue">0.0</span>
+             <button class="reset-slider-btn" data-target-slider="modelYOffset" data-reset-value="0" title="Reset Y Offset">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="objectRotationX">Rot X:</label>
+            <input type="range" id="objectRotationX" min="-180" max="180" value="0" step="1">
+            <span id="objectRotationXValue">0&deg;</span>
+             <button class="reset-slider-btn" data-target-slider="objectRotationX" data-reset-value="0" title="Reset X Rotation">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="objectRotationY">Rot Y:</label>
+            <input type="range" id="objectRotationY" min="-180" max="180" value="0" step="1">
+            <span id="objectRotationYValue">0&deg;</span>
+             <button class="reset-slider-btn" data-target-slider="objectRotationY" data-reset-value="0" title="Reset Y Rotation">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="objectRotationZ">Rot Z:</label>
+            <input type="range" id="objectRotationZ" min="-180" max="180" value="0" step="1">
+            <span id="objectRotationZValue">0&deg;</span>
+             <button class="reset-slider-btn" data-target-slider="objectRotationZ" data-reset-value="0" title="Reset Z Rotation">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="objectScale">Scale:</label>
+            <input type="range" id="objectScale" min="0.2" max="3.0" value="1.0" step="0.05">
+            <span id="objectScaleValue">1.00x</span>
+             <button class="reset-slider-btn" data-target-slider="objectScale" data-reset-value="1.0" title="Reset Scale">🔄</button>
+        </div>
+         <div class="control-group">
+            <label for="modelColorHue">Color Hue:</label>
+            <input type="range" id="modelColorHue" min="0" max="1" value="0.58" step="0.01">
+            <span id="modelColorHueValue">210&deg;</span>
+             <button class="reset-slider-btn" data-target-slider="modelColorHue" data-reset-value="0.58" title="Reset Hue">🔄</button>
+        </div>
+         <div class="control-group">
+            <label for="objectBrightness">Brightness:</label>
+            <input type="range" id="objectBrightness" min="0" max="1" value="0.5" step="0.01">
+            <span id="objectBrightnessValue">0.50</span>
+             <button class="reset-slider-btn" data-target-slider="objectBrightness" data-reset-value="0.5" title="Reset Brightness">🔄</button>
+        </div>
+         <div class="control-group">
+            <label for="objectRoughness">Roughness:</label>
+            <input type="range" id="objectRoughness" min="0" max="1" value="0.4" step="0.01">
+            <span id="objectRoughnessValue">0.40</span>
+             <button class="reset-slider-btn" data-target-slider="objectRoughness" data-reset-value="0.4" title="Reset Roughness">🔄</button>
+        </div>
+        <div class="control-group">
+            <label for="objectMetalness">Shine:</label>
+            <input type="range" id="objectMetalness" min="0" max="1" value="0.1" step="0.01">
+            <span id="objectMetalnessValue">0.10</span>
+             <button class="reset-slider-btn" data-target-slider="objectMetalness" data-reset-value="0.1" title="Reset Shine">🔄</button>
+        </div>
+        <hr>
+
+        <h3>Environment</h3>
+         <!-- Environment Controls -->
+         <div class="control-group">
+            <label for="wallHue">Wall Hue:</label>
+            <input type="range" id="wallHue" min="0" max="1" value="0.5" step="0.01">
+            <span id="wallHueValue">180&deg;</span>
+            <button class="reset-slider-btn" data-target-slider="wallHue" data-reset-value="0.5" title="Reset Wall Hue">🔄</button>
+         </div>
+          <div class="control-group">
+            <label for="wallSaturation">Wall Sat:</label>
+            <input type="range" id="wallSaturation" min="0" max="1" value="0.0" step="0.01">
+            <span id="wallSaturationValue">0.00</span>
+            <button class="reset-slider-btn" data-target-slider="wallSaturation" data-reset-value="0.0" title="Reset Wall Saturation">🔄</button>
+         </div>
+          <div class="control-group">
+            <label for="wallBrightness">Wall Bright:</label>
+            <input type="range" id="wallBrightness" min="0" max="0.7" value="0.1" step="0.01">
+            <span id="wallBrightnessValue">0.10</span>
+            <button class="reset-slider-btn" data-target-slider="wallBrightness" data-reset-value="0.1" title="Reset Wall Brightness">🔄</button>
+         </div>
+         <hr style="width:50%; margin-top:15px; margin-bottom:15px;">
+         <div class="control-group">
+            <label for="floorHue">Floor Hue:</label>
+            <input type="range" id="floorHue" min="0" max="1" value="0.5" step="0.01">
+            <span id="floorHueValue">180&deg;</span>
+            <button class="reset-slider-btn" data-target-slider="floorHue" data-reset-value="0.5" title="Reset Floor Hue">🔄</button>
+         </div>
+         <div class="control-group">
+            <label for="floorSaturation">Floor Sat:</label>
+            <input type="range" id="floorSaturation" min="0" max="1" value="0.0" step="0.01">
+            <span id="floorSaturationValue">0.00</span>
+             <button class="reset-slider-btn" data-target-slider="floorSaturation" data-reset-value="0.0" title="Reset Floor Saturation">🔄</button>
+         </div>
+         <div class="control-group">
+            <label for="floorBrightness">Floor Bright:</label>
+            <input type="range" id="floorBrightness" min="0.05" max="1.0" value="0.5" step="0.01">
+            <span id="floorBrightnessValue">0.50</span>
+             <button class="reset-slider-btn" data-target-slider="floorBrightness" data-reset-value="0.5" title="Reset Floor Brightness">🔄</button>
+        </div>
+
+
+        <!-- Debug Console Area -->
+        <div id="debug-console-container">
+            <div id="debug-console"></div>
+            <div id="debug-console-footer">
+                <button id="copyLogBtn">Copy Log</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Link to the external JavaScript file (must be type="module") -->
+    <script type="module" src="js/main.js"></script>
+
+</body>
+</html>
