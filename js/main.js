@@ -374,49 +374,75 @@ function updateObject(requestedShapeType) {
     if (objectRotationXSlider) objectRotationXSlider.value = 0;
     if (objectRotationYSlider) objectRotationYSlider.value = 0;
     if (objectRotationZSlider) objectRotationZSlider.value = 0;
-    if (objectScaleSlider) objectScaleSlider.value = 1.0; // Reset scale slider too
-    // Don't reset Y Offset slider here, keep its current value
+    if (objectScaleSlider) objectScaleSlider.value = 1.0;
+    if (modelYOffsetSlider) modelYOffsetSlider.value = 0; // <-- RESET Y OFFSET SLIDER
+    // Apply initial transform values (rotation/scale will be 0/1, Y will be set later)
     newObject.rotation.set(0, 0, 0);
-    newObject.scale.set(1, 1, 1); // Start with scale 1 before applying slider value
-    logToPage("Rotation/Scale sliders reset.");
-    updateObjectRotationDisplay(); // Update UI
-    // Call scale handler to update span for scale slider
+    newObject.scale.set(1, 1, 1);
+    logToPage("Rotation/Scale/Y-Offset sliders reset.");
+    updateObjectRotationDisplay(); // Update rotation UI spans
+    // Dispatch input events for sliders that were just reset to update their spans
     if (objectScaleSlider) objectScaleSlider.dispatchEvent(new Event('input'));
+    if (modelYOffsetSlider) modelYOffsetSlider.dispatchEvent(new Event('input')); // <-- UPDATE Y OFFSET SPAN
 
 
     // --- 6. Calculate Base Y Position ---
-    // (Bounds calculation remains the same as before)
     const boundingBox = new THREE.Box3();
     objectBaseY = 0;
     try {
-        const tempPos = newObject.position.clone();
-        const tempRot = newObject.rotation.clone();
-        const tempScale = newObject.scale.clone();
+        // Store original transform (position is irrelevant now, rotation/scale are reset)
+        // const tempPos = newObject.position.clone(); // No longer needed
+        const tempRot = newObject.rotation.clone(); // Still needed if we restore later? No, rotation is 0.
+        const tempScale = newObject.scale.clone(); // Still needed if we restore later? No, scale is 1.
+
+        // Reset transform for accurate bounds calculation (already done mostly)
         newObject.position.set(0,0,0);
-        newObject.rotation.set(0,0,0);
-        newObject.scale.set(1,1,1);
+        // newObject.rotation.set(0,0,0); // Already reset
+        // newObject.scale.set(1,1,1); // Already reset
+
+        // Force matrix update for the object and all its children
         newObject.updateMatrixWorld(true);
+
+        // For groups, ensure all children have updated matrices
+        if (newObject.isGroup) {
+            newObject.traverse(child => {
+                if (child.isMesh) child.updateMatrixWorld(true);
+            });
+        }
+
+        // Calculate bounding box
         boundingBox.setFromObject(newObject, true);
+
         if (!boundingBox.isEmpty()) {
-            objectBaseY = -boundingBox.min.y;
+            // Add a small buffer (0.01) to prevent floor intersection
+            objectBaseY = -boundingBox.min.y + 0.01;
             logToPage(`Calculated objectBaseY: ${objectBaseY.toFixed(3)} (MinY: ${boundingBox.min.y.toFixed(3)})`);
         } else {
             logToPage("Warning: BoundingBox empty during base Y calculation.", 'error');
         }
-        newObject.position.copy(tempPos);
-        newObject.rotation.copy(tempRot);
-        newObject.scale.copy(tempScale); // Restore original scale (likely 1,1,1)
-        newObject.updateMatrixWorld(true);
+
+        // Restore original transform - Not needed anymore as we reset sliders and apply 0/1 directly
+        // newObject.position.copy(tempPos);
+        // newObject.rotation.copy(tempRot);
+        // newObject.scale.copy(tempScale);
+        // newObject.updateMatrixWorld(true);
     } catch (boundsError) {
         logToPage(`Base bounds calculation error: ${boundsError.message}`, 'error');
-         objectBaseY = 0;
+        objectBaseY = 0;
     }
 
 
     // --- 7. Position Object & Apply Current Slider Values ---
-    onModelYOffsetChange(); // Apply Y offset based on new base Y and current slider
-    onObjectRotationChange(); // Apply rotation based on current sliders (likely 0 now)
-    onObjectScaleChange();   // Apply scale based on current slider (likely 1.0 now)
+    // Explicitly set the base Y position first using the calculated value
+    newObject.position.y = objectBaseY;
+    logToPage(`Set initial base Y position to: ${objectBaseY.toFixed(3)}`);
+
+    // Now, apply the offset from the slider (which is now 0) ON TOP of the base position
+    onModelYOffsetChange(); // Reads slider (value 0) and adds offset
+
+    // Apply other transforms (which are also default values now)
+    onObjectRotationChange(); // Reads sliders (value 0)
+    onObjectScaleChange();    // Reads slider (value 1.0)
 
 
     // --- 8. Add to Scene & Update World Center ---
@@ -453,6 +479,7 @@ function updateObject(requestedShapeType) {
     controls.update();
     logToPage("Light & controls targeted to object center.");
 }
+
 
 
 // --- DOM & Control Setup ---
