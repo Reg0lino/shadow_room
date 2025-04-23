@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'; // <-- ADD THIS
 import { createStackedSpheresGroup } from './combinations_basic.js'; // Import snowman base
 
 export const createSnowmanFigureGroup = (s, matClone) => createStackedSpheresGroup(s, matClone);
@@ -93,15 +94,73 @@ export function createPersonMixedGroup(s, matClone) {
     return group;
 }
 
-export function createPersonAbstractGroup(s, matClone) {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(s*0.5, s*2.0, s*0.3), matClone());
-    const head = new THREE.Mesh(new THREE.BoxGeometry(s*0.4, s*0.4, s*0.4), matClone());
-    head.position.y = s*1.0 + s*0.2;
-    body.castShadow = true; head.castShadow = true;
-    group.add(body, head);
-    return group;
+// --- Replace the old createPersonAbstractGroup ---
+// Make it async to use await for the loader
+export async function createPersonAbstractGroup(s, matClone) {
+    const loader = new GLTFLoader();
+    // IMPORTANT: Replace this path with the actual path to YOUR model file!
+    // You'll need to create a 'models' folder at the root of your project.
+    const modelPath = 'models/person_abstract.glb'; // <-- ADJUST THIS PATH
+    const targetHeight = s * 2.0; // Target height based on original abstract shape (s=1.5 -> height=3.0)
+
+    try {
+        console.log(`Attempting to load model: ${modelPath}`); // Use console.log for loader progress
+        const gltf = await loader.loadAsync(modelPath); // Use loadAsync for await
+        console.log(`Model loaded successfully: ${modelPath}`);
+
+        const modelGroup = gltf.scene || gltf.scenes[0]; // Get the main scene group
+
+        if (!modelGroup) {
+            throw new Error("Loaded GLTF has no scene data.");
+        }
+
+        // --- Calculate Scaling ---
+        const box = new THREE.Box3().setFromObject(modelGroup);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+
+        let scaleFactor = 1.0;
+        if (size.y > 0.001) { // Avoid division by zero or tiny values
+            scaleFactor = targetHeight / size.y;
+            console.log(`Original height: ${size.y.toFixed(2)}, Target height: ${targetHeight.toFixed(2)}, Scale factor: ${scaleFactor.toFixed(3)}`);
+        } else {
+            console.warn("Model has zero or very small height, using default scale 1.0.");
+        }
+
+        modelGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        modelGroup.updateMatrixWorld(true); // Update world matrix after scaling
+
+        // --- Apply Shadows & Material (Optional) ---
+        modelGroup.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                // Optional: Replace existing materials with the cloned one
+                // child.material = matClone();
+                // Or just ensure the existing material is double-sided if needed
+                if (child.material) {
+                     child.material.side = THREE.DoubleSide; // Good practice for loaded models
+                     // You might want to adjust roughness/metalness here too if the model's aren't suitable
+                     // child.material.roughness = 0.5;
+                     // child.material.metalness = 0.1;
+                }
+            }
+        });
+
+        console.log("Applied scale and shadow settings to the loaded model.");
+        return modelGroup; // Return the loaded, scaled, and configured group
+
+    } catch (error) {
+        console.error(`Failed to load or process model ${modelPath}:`, error);
+        // Fallback: return a simple box if loading fails
+        const fallbackGeo = new THREE.BoxGeometry(s * 0.5, targetHeight, s * 0.3);
+        const fallbackMesh = new THREE.Mesh(fallbackGeo, matClone());
+        fallbackMesh.castShadow = true;
+        const fallbackGroup = new THREE.Group();
+        fallbackGroup.add(fallbackMesh);
+        return fallbackGroup;
+    }
 }
+// --- End of replaced function ---
 
 export function createBasicRobotGroup(s, matClone) {
     const group = new THREE.Group();
