@@ -1147,19 +1147,19 @@ function populateObjectList() {
         nameSpan.title = objData.originalType; // Show full type on hover
         li.appendChild(nameSpan);
 
-        // Create delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = 'X';
-        deleteBtn.title = `Delete ${displayName}`;
-        deleteBtn.classList.add('delete-object-btn');
-        deleteBtn.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent li click event from firing
-            // Confirmation before deleting
-            if (window.confirm(`Are you sure you want to delete "${displayName}"?`)) {
-                deleteObject(objData.uuid);
-            }
-        });
-        li.appendChild(deleteBtn);
+                // Create delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'X';
+                deleteBtn.title = `Delete ${displayName}`;
+                deleteBtn.classList.add('delete-object-btn');
+                deleteBtn.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent li click event from firing
+                    // --- REMOVED Confirmation ---
+                    // Directly call deleteObject when the button is clicked
+                    deleteObject(objData.uuid);
+                    // --- END REMOVAL ---
+                });
+                li.appendChild(deleteBtn);
 
         // Add click listener to select the object
         li.addEventListener('click', () => {
@@ -1509,25 +1509,26 @@ function handleOpenPoser() {
 }
 
 function toggleControls() {
-     // This function exists from the user's provided base file
     try {
-        // logToPage("Toggling controls..."); // Too noisy
         const isCollapsed = document.body.classList.toggle('controls-collapsed');
-        const isLandscape = window.matchMedia("(orientation: landscape)").matches;
-        const minWidthThreshold = 768; // Ensure this matches CSS media query
 
-        if (isLandscape && window.innerWidth >= minWidthThreshold) {
-            toggleControlsBtn.textContent = isCollapsed ? '>>' : '<<';
-        } else { // Portrait or small landscape
-            toggleControlsBtn.textContent = isCollapsed ? 'Expand' : 'Collapse';
-        }
+        // Use simpler, consistent button text/icons
+        // Option 1: Text
+        // toggleControlsBtn.textContent = isCollapsed ? 'Show Controls' : 'Hide Controls';
+        // Option 2: Arrows (Example)
+        toggleControlsBtn.textContent = isCollapsed ? '▲' : '▼';
+        toggleControlsBtn.title = isCollapsed ? 'Expand Controls' : 'Collapse Controls';
 
-        // logToPage(`Controls ${isCollapsed ? 'collapsed' : 'expanded'}.`); // Too noisy
-        // Delay resize slightly to allow CSS transitions to start
-        setTimeout(onWindowResize, 50);
+
+        logToPage(`Controls ${isCollapsed ? 'collapsed' : 'expanded'}.`);
+
+        // Delay resize slightly to allow CSS transitions/layout changes to start
+        // This ensures the renderer sizes to the *new* container dimensions
+        setTimeout(onWindowResize, 50); // Keep the resize call
 
     } catch (error) {
         logToPage(`Error toggling controls: ${error.message}`, 'error');
+        console.error("Toggle Controls Error:", error); // Log full error for details
     }
 }
 

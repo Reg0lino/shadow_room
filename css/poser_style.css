@@ -37,7 +37,7 @@ body {
 #controls {
     background: #2a2a2a;
     color: #fff;
-    padding: 5px 10px; /* Keep padding reasonable */
+    padding: 5px 10px;
     font-size: 1.05em; /* Base size for controls */
     border-bottom: 1px solid #444;
     z-index: 20;
@@ -47,15 +47,15 @@ body {
     flex-wrap: wrap; /* Allow wrapping */
     align-items: center;
     width: 100%;
-    height: auto;
+    height: auto; /* Auto height for wrapping */
     gap: 5px 10px; /* Row gap, Column gap */
     box-sizing: border-box;
-    overflow-y: hidden;
+    overflow-y: hidden; /* Hide vertical scrollbar if wrap causes too much height */
 }
 
 #controls .controls-group {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: nowrap; /* Keep buttons within group together */
     align-items: center;
     gap: 6px;
 }
@@ -66,7 +66,7 @@ body {
 #controls span {
     font-size: 1em; /* Relative to #controls */
     white-space: nowrap;
-    margin: 2px 0;
+    margin: 2px 0; /* Vertical margin for wrapped lines */
 }
 
 #controls button,
@@ -102,7 +102,7 @@ body {
 
 
 #transformModeControls {
-     /* First group, aligns left automatically */
+     /* Styles inherited from .controls-group */
 }
 #transformModeControls button {
     padding: 6px 10px;
@@ -163,7 +163,7 @@ canvas {
     width: auto;
     max-width: 420px;
     height: auto;
-    max-height: calc(100vh - 30px - 75px); /* Adjusted calculation slightly */
+    max-height: calc(100vh - 30px - 85px); /* Adjusted calculation slightly for potentially wrapped controls */
     overflow-y: auto;
     z-index: 30;
     box-shadow: 0 2px 16px #000a;
@@ -188,6 +188,9 @@ canvas {
     padding: 3px 5px;
     cursor: pointer;
     border-radius: 3px;
+    /* Remove centering for desktop view */
+    display: block;
+    text-align: left;
 }
 #boneListContainer li.selected {
     background: #004a99;
@@ -222,14 +225,14 @@ details[open] > summary {
         width: 100%;
         max-width: none;
         height: auto;
-        max-height: 45vh; /* Slightly increased max-height */
+        max-height: 45vh; /* Max height */
         border-top: 1px solid #444;
         border-radius: 0;
         box-shadow: none;
         background: #282828;
         z-index: 15;
         flex-shrink: 0;
-        padding: 12px 14px 12px 16px; /* Increased padding */
+        padding: 12px 14px 12px 16px;
         top: auto;
         right: auto;
 
@@ -239,38 +242,41 @@ details[open] > summary {
 
     #componentsInfo h3, #componentsInfo h4, #componentsInfo summary {
         font-size: 1.15em; /* Larger headings */
-        margin: 10px 0 5px 0; /* Adjust margin */
+        margin: 10px 0 5px 0;
     }
     #componentsInfo ul {
-        margin: 0 0 10px 18px; /* Adjust margin */
+        margin: 0 0 10px 18px;
         font-size: 1.1em; /* Larger list font */
     }
      #componentsInfo li {
-        padding: 6px 8px; /* Much larger padding for touch */
-        margin-bottom: 4px; /* Increase spacing */
+        padding: 7px 10px; /* Increased padding for touch */
+        margin-bottom: 5px; /* Increase spacing */
         font-size: 1.1em; /* Larger list item text */
         /* <<< Centering List Item Text >>> */
-        display: flex;
-        justify-content: center;
-        text-align: center;
+        display: flex; /* Use flex for centering */
+        justify-content: center; /* Center horizontally */
+        align-items: center; /* Center vertically */
+        text-align: center; /* Ensure text is centered */
+        min-height: 36px; /* Ensure minimum touch height */
      }
+     /* Keep selection style */
      #boneListContainer li.selected {
-         /* Keep selection style */
+         /* (style defined globally) */
      }
 
      /* Adjust top controls touch targets for mobile */
-     #controls {
-         padding: 6px 10px; /* Adjust padding */
-         gap: 6px 12px; /* Adjust gap */
+    #controls {
+         padding: 6px 10px;
+         gap: 6px 12px;
      }
     #controls button, #controls select {
-        min-width: 44px; /* Ensure larger touch target */
+        min-width: 44px; /* Larger touch target */
         min-height: 44px;
-        padding: 9px 13px; /* Adjust padding */
-        font-size: 1.05em; /* Slightly larger font in buttons */
+        padding: 9px 13px;
+        font-size: 1.05em;
      }
       #transformModeControls button {
-        padding: 8px 11px; /* Adjust padding */
+        padding: 8px 11px;
      }
 }
 

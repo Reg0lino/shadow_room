@@ -12,7 +12,7 @@
             <div id="transformModeControls" class="controls-group" style="display: none;">
                 <span>Transform:</span>
                 <!-- Reordered Buttons -->
-                <button id="rotateButton" class="transform-btn" data-mode="rotate">Rotate</button>
+                <button id="rotateButton" class="transform-btn active" data-mode="rotate">Rotate</button> <!-- Added active class initially -->
                 <button id="translateButton" class="transform-btn" data-mode="translate">Translate</button>
                 <button id="detachButton" title="Detach Transform Controls">Detach</button>
             </div>
@@ -70,7 +70,7 @@
     </script>
 
     <script type="module">
-        // --- Existing poser.html JavaScript ---
+        // --- Imports ---
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -91,6 +91,8 @@
         let history = [];
         let historyIndex = -1;
         let initialBoneState = [];
+        let loadedBoneMappings = null;
+        let boneMappingPromise = null;
 
         // --- DOM Element References ---
         const container = document.getElementById('container');
@@ -111,398 +113,165 @@
         const refreshModelButton = document.getElementById('refreshModelButton');
         const backToShadowRoomBtn = document.getElementById('backToShadowRoomBtn');
 
-        // --- Bone Mapping Configuration ---
-        const boneMappingConfig = { /* ... Your existing config ... */ };
-
-        // --- Initialization ---
-        init();
-        animate();
-
-        // --- Functions ---
-        function updateTransformButtonStyles() {
-            const currentMode = transformControls.mode;
-            document.querySelectorAll('.transform-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.mode === currentMode);
-            });
+        // --- Logging ---
+        function logToPage(message, type = 'info') {
+            console[type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'log'](`[${new Date().toLocaleTimeString()}] ${message}`);
         }
 
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x333333);
+        // --- Function Definitions (ALL DEFINITIONS BEFORE `init` definition) ---
 
-            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(2, 2, 2);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            container.appendChild(renderer.domElement);
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
-            controls.screenSpacePanning = false;
-            controls.minDistance = 0.5;
-            controls.maxDistance = 50;
-
-            transformControls = new TransformControls(camera, renderer.domElement);
-            transformControls.addEventListener('dragging-changed', (event) => { controls.enabled = !event.value; });
-            transformControls.addEventListener('mouseUp', () => { if (selectedBone) saveHistoryState(); });
-            transformControls.addEventListener('mode-changed', updateTransformButtonStyles);
-            scene.add(transformControls);
-
-            addLighting();
-
-            gridHelper = new THREE.GridHelper(40, 40, 0x888888, 0x444444);
-            gridHelper.position.y = 0;
-            scene.add(gridHelper);
-
-            wireframeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, side: THREE.DoubleSide });
-
-            // Event Listeners
-            savePoseDataBtn.addEventListener('click', savePoseDataLocally);
-            wireframeButton.addEventListener('click', toggleWireframe);
-            undoButton.addEventListener('click', undo);
-            redoButton.addEventListener('click', redo);
-            refreshModelButton.addEventListener('click', refreshModel);
-            backToShadowRoomBtn.addEventListener('click', () => window.close());
-
-            document.getElementById('rotateButton').addEventListener('click', () => transformControls.setMode('rotate')); // Changed order
-            document.getElementById('translateButton').addEventListener('click', () => transformControls.setMode('translate'));
-            detachButton.addEventListener('click', () => {
-                transformControls.detach();
-                selectedBone = null;
-                boneListContainer.querySelector('li.selected')?.classList.remove('selected');
-                controls.target.copy(modelCenter);
-                controls.update();
-            });
-
-            window.addEventListener('resize', onWindowResize, false);
-            window.addEventListener('keydown', handleKeyDown);
-
-            loadModelFromUrlParam();
-
-            // <<< Set Default Transform Mode to Rotate >>>
-            transformControls.setMode('rotate');
-            updateTransformButtonStyles(); // Update highlights
+        async function loadBoneMappings() {
+            logToPage("Attempting to load bone mappings from JSON...");
+            try {
+                const response = await fetch('js/bone_mappings.json');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                loadedBoneMappings = await response.json();
+                logToPage("Bone mappings loaded successfully.", "success");
+                return loadedBoneMappings;
+            } catch (error) {
+                logToPage(`Failed to load or parse bone mappings: ${error.message}`, "error");
+                console.error("Bone Mapping Load Error:", error);
+                loadedBoneMappings = {}; return loadedBoneMappings;
+            }
         }
-
-        // ... (rest of the existing JavaScript functions remain the same) ...
-        // loadModelFromUrlParam, addLighting, animate, onWindowResize,
-        // clearScene, loadSelectedModel, loadGLB, populateComponentsInfo,
-        // populateBoneList, handleBoneClick, toggleWireframe, saveInitialState,
-        // refreshModel, saveHistoryState, applyHistoryState, undo, redo,
-        // updateUndoRedoButtons, handleKeyDown, savePoseDataLocally, setInfo
 
         function onWindowResize() {
-            if (!container || !camera || !renderer) return;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            if (width > 0 && height > 0) {
-                 camera.aspect = width / height;
-                 camera.updateProjectionMatrix();
-                 renderer.setSize(width, height);
-            } else {
-                 console.warn(`Resize ignored: Invalid container dimensions ${width}x${height}`);
-            }
+             if (!container || !camera || !renderer) return;
+             const width = container.clientWidth; const height = container.clientHeight;
+             if (width > 0 && height > 0) { camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height); }
+             else { logToPage(`Resize ignored: Invalid container dimensions ${width}x${height}`, "warn"); }
+         }
+
+        function addLighting() {
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambientLight);
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); directionalLight.position.set(5, 10, 7.5); directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048; directionalLight.shadow.mapSize.height = 2048; directionalLight.shadow.camera.near = 0.5; directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -15; directionalLight.shadow.camera.right = 15; directionalLight.shadow.camera.top = 15; directionalLight.shadow.camera.bottom = -15;
+            directionalLight.shadow.bias = -0.0005; scene.add(directionalLight); logToPage("Poser lighting added.");
+        }
+
+        function updateTransformButtonStyles() {
+            if (!transformControls) return; const currentMode = transformControls.mode;
+            document.querySelectorAll('.transform-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.mode === currentMode); });
         }
 
         function clearScene() {
-            transformControls.detach();
-            if (loadedModelGroup) {
-                scene.remove(loadedModelGroup);
-                loadedModelGroup.traverse(child => {
-                    if (child.isMesh) {
-                        child.geometry?.dispose();
-                        const materials = Array.isArray(child.material) ? child.material : [child.material];
-                        materials.forEach(m => m?.dispose());
-                    }
-                });
-                 // console.log("Previous model removed.");
-            }
-            loadedModelGroup = null;
-            bones.length = 0;
-            selectedBone = null;
-            history = [];
-            historyIndex = -1;
-            initialBoneState = [];
-            originalMaterials.clear();
-            wireframeActive = false;
-            updateUndoRedoButtons();
+             transformControls.detach(); if (loadedModelGroup) { scene.remove(loadedModelGroup); loadedModelGroup.traverse(child => { if (child.isMesh) { child.geometry?.dispose(); const materials = Array.isArray(child.material) ? child.material : [child.material]; materials.forEach(m => m?.dispose()); } }); }
+             loadedModelGroup = null; bones.length = 0; selectedBone = null; history = []; historyIndex = -1; initialBoneState = [];
+             originalMaterials.clear(); wireframeActive = false; updateUndoRedoButtons();
+             meshListElement.innerHTML = ''; boneListContainer.innerHTML = ''; materialListElement.innerHTML = ''; animationListElement.innerHTML = ''; summaryElement.innerHTML = '';
+             logToPage("Scene cleared.", "info");
+         }
 
-            meshListElement.innerHTML = '';
-            boneListContainer.innerHTML = '';
-            materialListElement.innerHTML = '';
-            animationListElement.innerHTML = '';
-            summaryElement.innerHTML = '';
-        }
-        function loadSelectedModel(modelPath) {
-             clearScene();
-             setInfo(`Loading ${modelPath}...`, 'loading');
-             componentsInfoElement.style.display = 'none';
+        async function loadSelectedModel(modelPath) {
+             logToPage(`loadSelectedModel called for: ${modelPath}`); clearScene(); setInfo(`Loading ${modelPath}...`, 'loading'); componentsInfoElement.style.display = 'none';
+             savePoseDataBtn.disabled = true; if(transformModeControls) transformModeControls.style.display = 'none'; wireframeButton.disabled = true; undoButton.disabled = true; redoButton.disabled = true; refreshModelButton.disabled = true;
+             try { const response = await fetch(modelPath); if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for ${modelPath}`); const buffer = await response.arrayBuffer(); logToPage("Model data fetched."); await loadGLB(buffer, modelPath.split('/').pop());
+             } catch (error) { console.error('Error in loadSelectedModel:', error); logToPage(`Error loading ${modelPath}: ${error.message}`, 'error'); setInfo(`Error loading ${modelPath}`, 'error'); clearScene(); }
+         }
 
-             savePoseDataBtn.disabled = true;
-             transformModeControls.style.display = 'none';
-             wireframeButton.disabled = true;
-             undoButton.disabled = true;
-             redoButton.disabled = true;
-             refreshModelButton.disabled = true;
-
-             fetch(modelPath)
-                 .then(response => {
-                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for ${modelPath}`);
-                     return response.arrayBuffer();
-                 })
-                 .then(buffer => loadGLB(buffer, modelPath.split('/').pop()))
-                 .catch(error => {
-                     console.error('Error fetching/loading model:', error);
-                     setInfo(`Error loading: ${error.message}`, 'error');
-                     clearScene();
-                 });
-        }
-        function loadGLB(data, filename) {
-            const loader = new GLTFLoader();
-            loader.parse(data, '', (gltf) => {
-                loadedModelGroup = gltf.scene;
-                loadedModelGroup.animations = gltf.animations;
-                const box = new THREE.Box3().setFromObject(loadedModelGroup);
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = maxDim > 0 ? 2.0 / maxDim : 1.0;
-                loadedModelGroup.scale.set(scale, scale, scale);
-                loadedModelGroup.updateMatrixWorld(true);
-                const scaledBox = new THREE.Box3().setFromObject(loadedModelGroup);
-                const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-                const scaledBottomY = scaledBox.min.y;
-                loadedModelGroup.position.set(-scaledCenter.x, -scaledBottomY, -scaledCenter.z);
-                modelCenter.set(0, scaledBox.getSize(new THREE.Vector3()).y / 2, 0);
-                modelCenter.add(loadedModelGroup.position);
-                controls.target.copy(modelCenter);
-                controls.update();
-                loadedModelGroup.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        originalMaterials.set(child, child.material);
-                    }
-                });
-                scene.add(loadedModelGroup);
-                populateComponentsInfo(gltf, filename);
-                setInfo(`Loaded ${filename}`, 'success');
-                savePoseDataBtn.disabled = false;
-                wireframeButton.disabled = false;
-                refreshModelButton.disabled = false;
-                transformModeControls.style.display = 'flex';
-                saveInitialState();
-                saveHistoryState();
-                onWindowResize();
-            }, (error) => {
-                console.error('Error parsing GLB:', error);
-                setInfo(`Error parsing ${filename}: ${error}`, 'error');
-                clearScene();
+        async function loadGLB(data, filename) {
+            logToPage(`loadGLB called for: ${filename}`); const loader = new GLTFLoader();
+            return new Promise((resolve, reject) => {
+                loader.parse(data, '', async (gltf) => {
+                    logToPage("GLB parsed."); try { loadedModelGroup = gltf.scene; loadedModelGroup.animations = gltf.animations;
+                        const box = new THREE.Box3().setFromObject(loadedModelGroup); const size = box.getSize(new THREE.Vector3()); const maxDim = Math.max(size.x, size.y, size.z); const scale = maxDim > 0 ? 2.0 / maxDim : 1.0;
+                        loadedModelGroup.scale.set(scale, scale, scale); loadedModelGroup.updateMatrixWorld(true); const scaledBox = new THREE.Box3().setFromObject(loadedModelGroup); const scaledCenter = scaledBox.getCenter(new THREE.Vector3()); const scaledBottomY = scaledBox.min.y; loadedModelGroup.position.set(-scaledCenter.x, -scaledBottomY, -scaledCenter.z);
+                        logToPage("Model scaled and positioned."); modelCenter.set(0, scaledBox.getSize(new THREE.Vector3()).y / 2, 0); modelCenter.add(loadedModelGroup.position); controls.target.copy(modelCenter); controls.update();
+                        bones.length = 0; loadedModelGroup.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; originalMaterials.set(child, child.material); } if (child.isBone) bones.push(child); });
+                        scene.add(loadedModelGroup); logToPage(`Model added to scene. ${bones.length} bones found.`);
+                        logToPage("Waiting for bone mappings..."); const mappings = await boneMappingPromise; logToPage("Bone mappings available.");
+                        populateComponentsInfo(gltf, filename, mappings); setInfo(`Loaded ${filename}`, 'success');
+                        savePoseDataBtn.disabled = false; wireframeButton.disabled = false; refreshModelButton.disabled = false; if(transformModeControls) transformModeControls.style.display = 'flex';
+                        updateUndoRedoButtons(); logToPage("UI Updated after load."); saveInitialState(); saveHistoryState(); onWindowResize(); resolve();
+                    } catch (processingError) { logToPage(`Error processing GLB: ${processingError.message}\n${processingError.stack}`, "error"); setInfo(`Error processing ${filename}`, 'error'); reject(processingError); }
+                }, (error) => { console.error('Error parsing GLB:', error); logToPage(`Error parsing ${filename}: ${error}`, 'error'); setInfo(`Error parsing ${filename}`, 'error'); reject(error); });
             });
         }
-        function populateComponentsInfo(gltf, filename) {
-             meshListElement.innerHTML = '';
-             boneListContainer.innerHTML = '';
-             materialListElement.innerHTML = '';
-             animationListElement.innerHTML = '';
-             bones.length = 0;
-             let meshCount = 0;
-             let materialCount = 0;
-             const uniqueMaterials = new Set();
-             gltf.scene.traverse((child) => {
-                 if (child.isMesh) {
-                     meshCount++;
-                     const li = document.createElement('li');
-                     li.textContent = child.name || `Mesh ${meshCount}`;
-                     meshListElement.appendChild(li);
-                     const materials = Array.isArray(child.material) ? child.material : [child.material];
-                     materials.forEach(mat => mat && uniqueMaterials.add(mat));
-                 }
-                 if (child.isBone) bones.push(child);
-             });
-             uniqueMaterials.forEach((mat) => {
-                 materialCount++;
-                 const li = document.createElement('li');
-                 li.textContent = mat.name || `Material ${materialCount}`;
-                 materialListElement.appendChild(li);
-             });
-             populateBoneList();
-             if (gltf.animations && gltf.animations.length > 0) {
-                 gltf.animations.forEach((clip) => {
-                     const li = document.createElement('li');
-                     li.textContent = clip.name || 'Animation Clip';
-                     animationListElement.appendChild(li);
-                 });
-             } else {
-                 animationListElement.innerHTML = '<li>No animations found</li>';
-             }
-             summaryElement.innerHTML = `<strong>Filename:</strong> ${filename}<br><strong>Bones:</strong> ${bones.length}`;
-             componentsInfoElement.style.display = 'block';
+
+        function populateComponentsInfo(gltf, filename, mappings) {
+              meshListElement.innerHTML = ''; boneListContainer.innerHTML = ''; materialListElement.innerHTML = ''; animationListElement.innerHTML = '';
+              let meshCount = 0; let materialCount = 0; const uniqueMaterials = new Set();
+              gltf.scene.traverse((child) => { if (child.isMesh) { meshCount++; const li = document.createElement('li'); li.textContent = child.name || `Mesh ${meshCount}`; meshListElement.appendChild(li); const mats = Array.isArray(child.material) ? child.material : [child.material]; mats.forEach(mat => mat && uniqueMaterials.add(mat)); } });
+              uniqueMaterials.forEach((mat) => { materialCount++; const li = document.createElement('li'); li.textContent = mat.name || `Material ${materialCount}`; materialListElement.appendChild(li); });
+              populateBoneList(mappings);
+              if (gltf.animations && gltf.animations.length > 0) { gltf.animations.forEach((clip) => { const li = document.createElement('li'); li.textContent = clip.name || 'Animation Clip'; animationListElement.appendChild(li); }); }
+              else { animationListElement.innerHTML = '<li>No animations found</li>'; }
+              summaryElement.innerHTML = `<strong>Filename:</strong> ${filename}<br><strong>Bones:</strong> ${bones.length}`;
+              componentsInfoElement.style.display = 'block'; logToPage("Components info panel populated.");
+         }
+
+        function populateBoneList(allMappings) {
+            boneListContainer.innerHTML = ''; const modelMapping = allMappings ? allMappings[originalModelPath] : null;
+            if (!modelMapping) { logToPage(`No bone mapping for ${originalModelPath}. Raw names used.`, "warn"); const ul = document.createElement('ul'); bones.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(bone => { ul.appendChild(createAndAttachListItem({ bone: bone, friendlyName: bone.name || 'Unnamed Bone' })); }); boneListContainer.appendChild(ul); return; }
+            const groupedBones = {}; const groupOrder = ['Root', 'Rigging', 'Head', 'Torso', 'Arms', 'Hands', 'Legs', 'Feet', 'Other'];
+            bones.forEach(bone => { const mappingInfo = modelMapping[bone.name]; const boneInfo = { bone: bone, friendlyName: mappingInfo?.friendlyName || bone.name || 'Unnamed Bone', group: mappingInfo?.group || 'Other', subGroup: mappingInfo?.subGroup }; if (!groupedBones[boneInfo.group]) groupedBones[boneInfo.group] = { _root: [] }; const targetSubGroup = boneInfo.subGroup && boneInfo.subGroup !== '_root' ? boneInfo.subGroup : '_root'; if (!groupedBones[boneInfo.group][targetSubGroup]) groupedBones[boneInfo.group][targetSubGroup] = []; groupedBones[boneInfo.group][targetSubGroup].push(boneInfo); });
+            groupOrder.forEach(groupName => { const groupData = groupedBones[groupName]; if (!groupData || (groupData._root.length === 0 && Object.keys(groupData).length === 1)) return; const groupDetails = document.createElement('details'); groupDetails.open = !['Hands', 'Feet', 'Rigging', 'Other'].includes(groupName); const groupSummary = document.createElement('summary'); groupSummary.textContent = groupName; groupDetails.appendChild(groupSummary); const groupUl = document.createElement('ul'); groupData._root.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName)).forEach(boneInfo => { groupUl.appendChild(createAndAttachListItem(boneInfo)); }); Object.keys(groupData).filter(key => key !== '_root').sort().forEach(subGroupName => { const subGroupDetails = document.createElement('details'); subGroupDetails.open = false; const subGroupSummary = document.createElement('summary'); subGroupSummary.textContent = subGroupName; subGroupDetails.appendChild(subGroupSummary); const subGroupUl = document.createElement('ul'); groupData[subGroupName].sort((a, b) => a.friendlyName.localeCompare(b.friendlyName)).forEach(boneInfo => { subGroupUl.appendChild(createAndAttachListItem(boneInfo)); }); subGroupDetails.appendChild(subGroupUl); groupUl.appendChild(subGroupDetails); }); groupDetails.appendChild(groupUl); boneListContainer.appendChild(groupDetails); });
+            function createAndAttachListItem(boneInfo) { const li = document.createElement('li'); li.textContent = boneInfo.friendlyName; li.dataset.boneName = boneInfo.bone.name; li.addEventListener('click', handleBoneClick); return li; }
         }
-        function populateBoneList() {
-             boneListContainer.innerHTML = '';
-             const modelMapping = boneMappingConfig[originalModelPath];
-             if (!modelMapping) {
-                  console.warn(`No bone mapping for ${originalModelPath}.`);
-                  const ul = document.createElement('ul');
-                  bones.sort((a, b) => a.name.localeCompare(b.name)).forEach(bone => {
-                      ul.appendChild(createAndAttachListItem({ bone: bone, friendlyName: bone.name || 'Unnamed Bone' }));
-                  });
-                  boneListContainer.appendChild(ul);
-                  return;
-             }
-             const groupedBones = {};
-             const groupOrder = ['Root', 'Rigging', 'Head', 'Torso', 'Arms', 'Hands', 'Legs', 'Feet', 'Other'];
-             bones.forEach(bone => {
-                 const mappingInfo = modelMapping[bone.name];
-                 const boneInfo = { bone: bone, friendlyName: mappingInfo?.friendlyName || bone.name || 'Unnamed Bone', group: mappingInfo?.group || 'Other', subGroup: mappingInfo?.subGroup };
-                 if (!groupedBones[boneInfo.group]) groupedBones[boneInfo.group] = { _root: [] };
-                 const targetSubGroup = boneInfo.subGroup && boneInfo.subGroup !== '_root' ? boneInfo.subGroup : '_root';
-                 if (!groupedBones[boneInfo.group][targetSubGroup]) groupedBones[boneInfo.group][targetSubGroup] = [];
-                 groupedBones[boneInfo.group][targetSubGroup].push(boneInfo);
-             });
-             groupOrder.forEach(groupName => {
-                 const groupData = groupedBones[groupName];
-                 if (!groupData) return;
-                 const groupDetails = document.createElement('details');
-                 groupDetails.open = !['Hands', 'Feet', 'Rigging', 'Other'].includes(groupName);
-                 const groupSummary = document.createElement('summary');
-                 groupSummary.textContent = groupName;
-                 groupDetails.appendChild(groupSummary);
-                 const groupUl = document.createElement('ul');
-                 groupData._root.sort((a,b) => a.friendlyName.localeCompare(b.friendlyName)).forEach(boneInfo => { groupUl.appendChild(createAndAttachListItem(boneInfo)); });
-                 Object.keys(groupData).sort().forEach(subGroupName => {
-                     if (subGroupName === '_root') return;
-                     const subGroupDetails = document.createElement('details');
-                     subGroupDetails.open = false;
-                     const subGroupSummary = document.createElement('summary');
-                     subGroupSummary.textContent = subGroupName;
-                     subGroupDetails.appendChild(subGroupSummary);
-                     const subGroupUl = document.createElement('ul');
-                     groupData[subGroupName].sort((a,b) => a.friendlyName.localeCompare(b.friendlyName)).forEach(boneInfo => { subGroupUl.appendChild(createAndAttachListItem(boneInfo)); });
-                     subGroupDetails.appendChild(subGroupUl);
-                     groupUl.appendChild(subGroupDetails);
-                 });
-                 groupDetails.appendChild(groupUl);
-                 boneListContainer.appendChild(groupDetails);
-             });
-             function createAndAttachListItem(boneInfo) {
-                 const li = document.createElement('li');
-                 li.textContent = boneInfo.friendlyName;
-                 li.dataset.boneName = boneInfo.bone.name;
-                 li.addEventListener('click', handleBoneClick);
-                 return li;
-             }
-        }
-        function handleBoneClick(event) {
-             const li = event.currentTarget;
-             const boneName = li.dataset.boneName;
-             const targetBone = bones.find(b => b.name === boneName);
-             if (!targetBone) return;
-             boneListContainer.querySelector('li.selected')?.classList.remove('selected');
-             li.classList.add('selected');
-             selectedBone = targetBone;
-             transformControls.attach(targetBone);
-             const boneWorldPosition = new THREE.Vector3();
-             targetBone.getWorldPosition(boneWorldPosition);
-             controls.target.copy(boneWorldPosition);
-             controls.update();
-        }
-        function toggleWireframe() {
-             if (!loadedModelGroup) return;
-             wireframeActive = !wireframeActive;
-             loadedModelGroup.traverse((child) => {
-                 if (child.isMesh) {
-                     if (wireframeActive) {
-                         if (!originalMaterials.has(child)) originalMaterials.set(child, child.material);
-                         child.material = wireframeMaterial;
-                     } else {
-                         if (originalMaterials.has(child)) child.material = originalMaterials.get(child);
-                     }
-                 }
-             });
-              console.log(`Wireframe ${wireframeActive ? 'on' : 'off'}`);
-        }
-        function saveInitialState() {
-             initialBoneState = bones.map(bone => ({ name: bone.name, position: bone.position.clone(), quaternion: bone.quaternion.clone(), scale: bone.scale.clone() }));
-        }
-        function refreshModel() {
-             if (!originalModelPath) { setInfo("Cannot refresh: No model loaded.", "error"); return; }
-             setInfo(`Refreshing: ${originalModelPath}`, 'loading');
-             loadSelectedModel(originalModelPath);
-        }
-        function saveHistoryState() {
-             if (!loadedModelGroup || bones.length === 0) return;
-             const currentState = bones.map(bone => ({ name: bone.name, position: bone.position.clone(), quaternion: bone.quaternion.clone(), scale: bone.scale.clone() }));
-             if (historyIndex < history.length - 1) history.length = historyIndex + 1;
-             history.push(currentState);
-             if (history.length > MAX_HISTORY) history.shift();
-             historyIndex = history.length - 1;
-             updateUndoRedoButtons();
-        }
-        function applyHistoryState(stateIndex) {
-             if (stateIndex < 0 || stateIndex >= history.length) return;
-             const stateToApply = history[stateIndex];
-             let boneFound = false;
-             stateToApply.forEach(boneState => {
-                 const bone = bones.find(b => b.name === boneState.name);
-                 if (bone) { bone.position.copy(boneState.position); bone.quaternion.copy(boneState.quaternion); bone.scale.copy(boneState.scale); boneFound = true; }
-             });
-             if (boneFound && loadedModelGroup) { loadedModelGroup.traverse(obj => { if (obj.isSkinnedMesh) obj.skeleton.update(); }); }
-             historyIndex = stateIndex;
-             updateUndoRedoButtons();
-             if (selectedBone) {
-                  transformControls.attach(selectedBone);
-                  const boneWorldPosition = new THREE.Vector3();
-                  selectedBone.getWorldPosition(boneWorldPosition);
-                  controls.target.copy(boneWorldPosition);
-                  controls.update();
-             } else {
-                  transformControls.detach();
-                  controls.target.copy(modelCenter);
-                  controls.update();
-             }
-        }
+
+        function handleBoneClick(event) { const li = event.currentTarget; const boneName = li.dataset.boneName; const targetBone = bones.find(b => b.name === boneName); if (!targetBone) return; boneListContainer.querySelector('li.selected')?.classList.remove('selected'); li.classList.add('selected'); selectedBone = targetBone; transformControls.attach(targetBone); const bp = new THREE.Vector3(); targetBone.getWorldPosition(bp); controls.target.copy(bp); controls.update(); }
+        function toggleWireframe() { if (!loadedModelGroup) return; wireframeActive = !wireframeActive; loadedModelGroup.traverse((c) => { if (c.isMesh) { if(wireframeActive){if(!originalMaterials.has(c)) originalMaterials.set(c, c.material); c.material = wireframeMaterial;} else {if(originalMaterials.has(c)) c.material = originalMaterials.get(c);}}}); logToPage(`Wireframe ${wireframeActive ? 'on' : 'off'}`, 'info'); }
+        function saveInitialState() { initialBoneState = bones.map(b => ({ name: b.name, position: b.position.clone(), quaternion: b.quaternion.clone(), scale: b.scale.clone() })); logToPage(`Initial state saved for ${bones.length} bones.`); }
+        function refreshModel() { if (!originalModelPath) { setInfo("Cannot refresh: No model loaded.", "error"); return; } setInfo(`Refreshing: ${originalModelPath}`, 'loading'); loadSelectedModel(originalModelPath); }
+        function saveHistoryState() { if (!loadedModelGroup || bones.length === 0) return; const state = bones.map(b => ({ name: b.name, position: b.position.clone(), quaternion: b.quaternion.clone(), scale: b.scale.clone() })); if (historyIndex < history.length - 1) history.length = historyIndex + 1; history.push(state); if (history.length > MAX_HISTORY) history.shift(); historyIndex = history.length - 1; updateUndoRedoButtons(); }
+        function applyHistoryState(index) { if (index < 0 || index >= history.length) return; const state = history[index]; let found = false; state.forEach(bs => { const bone = bones.find(b => b.name === bs.name); if(bone){bone.position.copy(bs.position); bone.quaternion.copy(bs.quaternion); bone.scale.copy(bs.scale); found=true;} }); if (found && loadedModelGroup) { loadedModelGroup.traverse(o => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.update(); }); } historyIndex = index; updateUndoRedoButtons(); if (selectedBone) { transformControls.attach(selectedBone); const bp = new THREE.Vector3(); selectedBone.getWorldPosition(bp); controls.target.copy(bp); controls.update(); } else { transformControls.detach(); controls.target.copy(modelCenter); controls.update(); } }
         function undo() { if (historyIndex > 0) applyHistoryState(historyIndex - 1); }
         function redo() { if (historyIndex < history.length - 1) applyHistoryState(historyIndex + 1); }
-        function updateUndoRedoButtons() {
-             undoButton.disabled = historyIndex <= 0;
-             redoButton.disabled = historyIndex >= history.length - 1;
+        function updateUndoRedoButtons() { if (!undoButton || !redoButton) return; undoButton.disabled = historyIndex <= 0; redoButton.disabled = historyIndex >= history.length - 1; }
+        function handleKeyDown(event) { if (document.activeElement && ['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(document.activeElement.tagName)) return; const ctrl = event.ctrlKey || event.metaKey; const key = event.key.toLowerCase(); if (ctrl && key === 'z') { event.preventDefault(); undo(); } else if (ctrl && key === 'y') { event.preventDefault(); redo(); } else if (key === 't') { event.preventDefault(); transformControls.setMode('translate'); } else if (key === 'r') { event.preventDefault(); transformControls.setMode('rotate'); } else if (event.key === 'Escape') { event.preventDefault(); detachButton.click(); } }
+        function savePoseDataLocally() { if (!loadedModelGroup || !originalModelPath || bones.length === 0) { setInfo('Load model first.', 'error'); return; } const name = prompt("Pose name:", "New Pose"); if (!name?.trim()) { setInfo('Save cancelled.', 'info'); return; } const tName = name.trim(); setInfo(`Saving pose "${tName}"...`, 'loading'); try { const data = bones.map(b => ({ name: b.name, p: b.position.toArray(), q: b.quaternion.toArray(), s: b.scale.toArray() })); const key = `poses_${originalModelPath}`; let poses = {}; try { const stored = localStorage.getItem(key); if (stored) poses = JSON.parse(stored); if (typeof poses !== 'object' || poses === null) poses = {}; } catch (e) { console.error(`Err parse ${key}:`, e); poses={}; } poses[tName] = data.map(d => ({ name: d.name, position: d.p, quaternion: d.q, scale: d.s })); localStorage.setItem(key, JSON.stringify(poses)); setInfo(`Pose "${tName}" saved. Refresh Shadow Room.`, 'success'); console.log(`Pose "${tName}" saved:`, key); } catch (err) { console.error('Err save pose:', err); setInfo(`Save failed: ${err.message}`, 'error'); } }
+        function setInfo(message, type = 'info') { if (!infoElement) return; logToPage(`setInfo: type=${type}, msg=${message}`); infoElement.textContent = message; infoElement.className = type; }
+        function animate() { requestAnimationFrame(animate); if(controls) controls.update(); if(renderer && scene && camera) renderer.render(scene, camera); }
+
+         // <<< loadModelFromUrlParam DEFINITION IS NOW HERE, BEFORE init >>>
+        function loadModelFromUrlParam() {
+            logToPage("Checking URL parameters for model...");
+            const params = new URLSearchParams(window.location.search);
+            const modelToLoad = params.get('model');
+            if (modelToLoad) {
+                const decodedPath = decodeURIComponent(modelToLoad);
+                logToPage(`URL parameter found: Attempting to load model '${decodedPath}'`);
+                originalModelPath = decodedPath;
+                loadSelectedModel(decodedPath); // Call the async load function
+            } else {
+                logToPage("No 'model' parameter found in URL.", "warn");
+                setInfo('Error: No model specified in URL.', 'error');
+                savePoseDataBtn.disabled = true; wireframeButton.disabled = true;
+                undoButton.disabled = true; redoButton.disabled = true; refreshModelButton.disabled = true;
+                if (transformModeControls) transformModeControls.style.display = 'none';
+            }
         }
-        function handleKeyDown(event) {
-             if (document.activeElement && ['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-             const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-             if (isCtrlOrCmd && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); }
-             else if (isCtrlOrCmd && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); }
-             else if (event.key.toLowerCase() === 't') { event.preventDefault(); transformControls.setMode('translate'); }
-             else if (event.key.toLowerCase() === 'r') { event.preventDefault(); transformControls.setMode('rotate'); }
-             else if (event.key === 'Escape') { event.preventDefault(); detachButton.click(); }
+
+
+        // --- >>> INIT FUNCTION DEFINITION <<< ---
+        function init() {
+            logToPage("Init start...");
+            try {
+                scene = new THREE.Scene(); scene.background = new THREE.Color(0x333333);
+                if (container.clientWidth <= 0 || container.clientHeight <= 0) { logToPage("Container has zero dimensions initially.", "warn"); }
+                camera = new THREE.PerspectiveCamera(75, (container.clientWidth / container.clientHeight) || 1, 0.1, 1000); camera.position.set(2, 2, 2);
+                renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; container.appendChild(renderer.domElement);
+                logToPage("Renderer added."); onWindowResize(); // <<< Call initial resize
+                controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.screenSpacePanning = false; controls.minDistance = 0.5; controls.maxDistance = 50; logToPage("OrbitControls setup.");
+                transformControls = new TransformControls(camera, renderer.domElement); transformControls.addEventListener('dragging-changed', (event) => { controls.enabled = !event.value; }); transformControls.addEventListener('mouseUp', () => { if (selectedBone) saveHistoryState(); }); transformControls.addEventListener('mode-changed', updateTransformButtonStyles); scene.add(transformControls); logToPage("TransformControls setup.");
+                addLighting();
+                gridHelper = new THREE.GridHelper(40, 40, 0x888888, 0x444444); gridHelper.position.y = 0; scene.add(gridHelper); wireframeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, side: THREE.DoubleSide }); logToPage("Helpers and materials setup.");
+                // Event Listeners
+                savePoseDataBtn.addEventListener('click', savePoseDataLocally); wireframeButton.addEventListener('click', toggleWireframe); undoButton.addEventListener('click', undo); redoButton.addEventListener('click', redo); refreshModelButton.addEventListener('click', refreshModel); backToShadowRoomBtn.addEventListener('click', () => window.close()); document.getElementById('rotateButton').addEventListener('click', () => transformControls.setMode('rotate')); document.getElementById('translateButton').addEventListener('click', () => transformControls.setMode('translate')); detachButton.addEventListener('click', () => { transformControls.detach(); selectedBone = null; boneListContainer.querySelector('li.selected')?.classList.remove('selected'); controls.target.copy(modelCenter); controls.update(); }); window.addEventListener('resize', onWindowResize, false); window.addEventListener('keydown', handleKeyDown); logToPage("Event listeners added.");
+
+                loadModelFromUrlParam(); // <<< THIS CALL IS NOW SAFE >>>
+
+                transformControls.setMode('rotate'); updateTransformButtonStyles();
+                animate(); // Start Animation Loop
+                logToPage("Init complete. Animation loop started.");
+            } catch (error) { logToPage(`Critical Init Error: ${error.message}\n${error.stack}`, "error"); container.innerHTML = `<p style='color: red; padding: 20px;'>Initialization Failed: ${error.message}</p>`; }
         }
-        function savePoseDataLocally() {
-             if (!loadedModelGroup || !originalModelPath || bones.length === 0) { setInfo('Load a model with bones first.', 'error'); return; }
-             const poseName = prompt("Enter a name for this pose:", "New Pose");
-             if (!poseName || poseName.trim() === "") { setInfo('Save cancelled.', 'info'); return; }
-             const trimmedPoseName = poseName.trim();
-             setInfo(`Saving pose "${trimmedPoseName}"...`, 'loading');
-             try {
-                 const currentPoseData = bones.map(bone => ({ name: bone.name, position: bone.position.toArray(), quaternion: bone.quaternion.toArray(), scale: bone.scale.toArray() }));
-                 const storageKey = `poses_${originalModelPath}`;
-                 let existingPoses = {};
-                 try { const storedData = localStorage.getItem(storageKey); if (storedData) existingPoses = JSON.parse(storedData); if (typeof existingPoses !== 'object' || existingPoses === null) existingPoses = {}; } catch (e) { console.error(`Error parsing pose data for ${storageKey}:`, e); existingPoses = {}; }
-                 existingPoses[trimmedPoseName] = currentPoseData;
-                 localStorage.setItem(storageKey, JSON.stringify(existingPoses));
-                 setInfo(`Pose "${trimmedPoseName}" saved. Refresh Shadow Room.`, 'success');
-                 console.log(`Pose "${trimmedPoseName}" saved to key: ${storageKey}`);
-             } catch (saveError) { console.error('Error saving pose data:', saveError); setInfo(`Save failed: ${saveError.message}`, 'error'); }
-        }
-        function setInfo(message, type = 'info') {
-             if (!infoElement) return;
-             infoElement.textContent = message;
-             infoElement.className = type;
-        }
+        // --- >>> END OF INIT FUNCTION DEFINITION <<< ---
+
+        // --- Start Execution ---
+        boneMappingPromise = loadBoneMappings(); // Start loading mappings first
+        init(); // <<< CALL INIT AT THE VERY END >>>
 
     </script>
 
