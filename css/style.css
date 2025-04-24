@@ -11,6 +11,7 @@
     --button-bg: #4a4a4a;
     --button-border: #666;
     --button-hover-bg: #5a5a5a;
+    --list-selected-bg: #004a99; /* Defined selection color */
     --debug-bg: #303030;
     --debug-text: #a0a0a0;
     --debug-error-text: #ff8080;
@@ -50,52 +51,67 @@ body {
 }
 #scene-container:active { cursor: grabbing; }
 
+/* Controls Container - Main Styling */
 #controls-container {
     /* Default: Portrait Layout (Bottom) */
-    flex: 0 0 auto; /* Don't grow or shrink, size based on height/max-height */
+    flex: 0 0 auto; /* Don't grow/shrink initially */
     height: 50%; /* Default expanded height */
-    max-height: 50%; /* Explicit max-height */
+    max-height: 50%; /* Limit height in portrait */
     background-color: var(--bg-dark-controls);
-    padding: 0 15px 10px 15px;
+    border-top: 1px solid var(--border-dark);
     box-sizing: border-box;
-    overflow-y: auto;
-    overflow-x: hidden;
+    position: relative; /* Needed for sticky header */
+    display: flex; /* Use flexbox for layout */
+    flex-direction: column; /* Stack header, content, console */
+    overflow: hidden; /* Hide overflow initially, scroll is on child */
+    transition: height 0.3s ease-out, max-height 0.3s ease-out, width 0.3s ease-out, border-color 0.3s ease-out;
+}
+
+/* Scrollable Content Area (NEW WRAPPER) */
+#controls-scroll-wrapper {
+    flex: 1 1 auto; /* Take remaining space between header and console */
+    min-height: 0; /* <<< ADD THIS LINE - Crucial for flex scrolling */
+    overflow-y: auto; /* Enable scrolling ONLY for this part */
+    padding: 0 15px 10px 15px; /* Inner padding for content */
     display: flex;
     flex-direction: column;
     gap: 8px;
-    border-top: 1px solid var(--border-dark);
-    position: relative; /* Needed for sticky header */
-    /* Smooth transitions for size changes */
-    transition: height 0.3s ease-out, max-height 0.3s ease-out, padding 0.3s ease-out, border-color 0.3s ease-out;
-    /* Explicitly prevent growing/shrinking beyond basis in column mode */
-    min-height: 0; /* Allow shrinking if needed, but controlled by height/max-height */
 }
+
 
 /* Header for sticky button */
 #controls-header {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background-color: var(--bg-dark-controls);
-    padding: 10px 15px 5px 15px; /* Adjusted padding */
-    margin: 0 -15px 5px -15px; /* Adjust margin to match padding */
-    border-bottom: 1px solid var(--border-dark);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    min-height: 25px;
-    box-sizing: content-box; /* Ensure padding doesn't affect width calc */
+    flex-shrink: 0; /* Prevent header from shrinking */
+    position: sticky; /* Make header sticky *within* the scroll wrapper if desired, OR keep it outside */
+    /* Let's keep it outside the scroll wrapper for guaranteed visibility */
+    /* Remove sticky positioning from here if placing outside scroll wrapper */
+     padding: 10px 15px 8px 15px; /* Adjust padding */
+     background-color: var(--bg-dark-controls);
+     border-bottom: 1px solid var(--border-dark);
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     min-height: 30px; /* Base height */
+     box-sizing: border-box;
+     z-index: 20;
 }
 
 #controls-header-left {
     display: flex;
-    gap: 10px;
+    gap: 8px; /* Adjust gap as needed */
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+    flex-grow: 1; /* Allow left side to take available space */
+    padding-bottom: 2px; /* Add slight padding if wrapping occurs */
+}
+#controls-header > button#toggleControlsBtn {
+     flex-shrink: 0; /* Prevent collapse button shrinking */
+     margin-left: 10px; /* Add space from left group */
 }
 
-#toggleControlsBtn, #cameraLockBtn, #saveStateBtn, #loadStateBtn, #resetSceneBtn {
-    /* Common button styles */
+
+/* Common button styles in header */
+#controls-header button {
     padding: 4px 8px;
     font-size: 0.8em;
     cursor: pointer;
@@ -104,38 +120,44 @@ body {
     border: 1px solid var(--button-border);
     border-radius: 3px;
     white-space: nowrap;
+    margin-bottom: 2px; /* Add spacing when wrapped */
 }
-#toggleControlsBtn:hover, #cameraLockBtn:hover, #saveStateBtn:hover, #loadStateBtn:hover, #resetSceneBtn:hover {
+#controls-header button:hover {
     background-color: var(--button-hover-bg);
 }
 
 /* --- Collapse/Expand Styles (Portrait Default) --- */
 body.controls-collapsed #controls-container {
-    height: 35px; /* Fixed height when collapsed */
-    max-height: 35px;
-    min-height: 35px; /* Explicit min-height */
+    height: auto; /* Height based on header content */
+    max-height: 60px; /* Limit height when collapsed */
     overflow: hidden;
-    padding: 0 15px; /* Keep padding for header alignment */
+    padding: 0; /* Remove padding for collapsed state */
     border-top: none;
 }
 body.controls-collapsed #controls-header {
-     padding-top: 5px;
-     padding-bottom: 5px;
-     margin-bottom: 0;
-     margin-left: -15px; /* Align with container padding removal */
-     margin-right: -15px;
+     padding: 5px 15px; /* Adjust padding when collapsed */
      border-bottom: none;
  }
-/* Scene container takes up remaining space naturally via flex: 1 1 auto */
-body.controls-collapsed #controls-container > *:not(#controls-header) {
-    display: none;
+
+body.controls-collapsed #controls-scroll-wrapper {
+    display: none; /* Hide scrollable content */
+}
+body.controls-collapsed #debug-console-container {
+    display: none; /* Hide console when collapsed */
 }
 
 
-/* --- Control Element Styling (Dark Mode) --- */
-h3, hr, .control-group, #search-container, #view-options {
-     clear: both;
+/* --- Control Element Styling (Inside Scroll Wrapper) --- */
+#controls-scroll-wrapper h3,
+#controls-scroll-wrapper hr,
+#controls-scroll-wrapper .control-group,
+#controls-scroll-wrapper #search-container,
+#controls-scroll-wrapper #object-management-section { /* Added #object-management-section */
+     clear: both; /* Still useful potentially */
+     width: 100%; /* Ensure elements take full width */
+     box-sizing: border-box;
  }
+
 #search-container {
     display: flex; gap: 8px; align-items: center; margin-bottom: 5px; margin-top: 5px;
 }
@@ -172,15 +194,10 @@ select#shapeSelect option { font-size: 0.9em; }
      padding: 4px 10px; font-size: 0.8em; cursor: pointer; background-color: var(--button-bg); color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px; margin-top: 8px; margin-bottom: 8px; display: block; margin-left: auto; margin-right: auto; width: fit-content;
 }
  #resetObjectBtn:hover { background-color: var(--button-hover-bg); }
-#view-options {
-    display: flex; gap: 10px; align-items: center; font-size: 0.8em; margin: 0;
-}
- #view-options label {
-     color: var(--text-label-pink); cursor: pointer; white-space: nowrap;
- }
- #view-options input[type="checkbox"] {
-      cursor: pointer; accent-color: var(--text-label-pink); margin-right: 2px; transform: scale(0.9);
-  }
+/* View options moved to header */
+/* #view-options { display: flex; gap: 10px; align-items: center; font-size: 0.8em; margin: 0; } */
+/* #view-options label { color: var(--text-label-pink); cursor: pointer; white-space: nowrap; } */
+/* #view-options input[type="checkbox"] { cursor: pointer; accent-color: var(--text-label-pink); margin-right: 2px; transform: scale(0.9); } */
 h3 {
     margin: 15px 0 8px 0; text-align: center; font-weight: normal; font-size: 1.0em; color: var(--text-heading-purple); border-bottom: 1px solid var(--border-dark); padding-bottom: 4px;
 }
@@ -188,103 +205,187 @@ hr {
     border: none; border-top: 1px solid var(--border-dark); margin: 10px 0; width: 90%; margin-left: auto; margin-right: auto;
 }
 
-/* --- Debug Console Styles (Integrated) --- */
+/* --- Debug Console Styles (Positioned at Bottom of Container) --- */
 #debug-console-container {
-    position: relative; width: auto; margin-top: 15px; max-height: 150px; background-color: var(--debug-bg); border: 1px solid var(--border-dark); z-index: 10; display: flex; flex-direction: column; border-radius: 3px;
+    flex-shrink: 0; /* Prevent shrinking */
+    width: 100%;    /* Take full width of parent */
+    height: 120px; /* Fixed initial height */
+    max-height: 200px; /* Allow resizing up to a point */
+    min-height: 40px;  /* Prevent becoming too small */
+    background-color: var(--debug-bg);
+    border-top: 1px solid var(--border-dark); /* Border on top */
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box; /* Include padding/border in size */
+    resize: vertical; /* Allow user to resize vertically */
+    overflow: hidden; /* Hide resize handle overflow */
+    margin: 0 -15px -10px -15px; /* Use negative margin to span full width */
+    padding: 0 15px 0 15px; /* Add padding back inside */
 }
+
 #debug-console {
-    flex-grow: 1; overflow-y: auto; padding: 5px; font-family: monospace; font-size: 0.7em; color: var(--debug-text); line-height: 1.3;
+    flex-grow: 1; /* Take available space */
+    overflow-y: auto; /* Scroll content */
+    padding: 5px;
+    font-family: monospace;
+    font-size: 0.7em;
+    color: var(--debug-text);
+    line-height: 1.3;
+    height: 100%; /* Ensure it tries to fill container */
 }
-#debug-console p {
-    margin: 0 0 2px 0; padding: 0; white-space: pre-wrap; word-break: break-all;
-}
+
+#debug-console p { margin: 0 0 2px 0; padding: 0; white-space: pre-wrap; word-break: break-all; }
 #debug-console .error { color: var(--debug-error-text); font-weight: bold; }
 #debug-console .success { color: var(--debug-success-text); font-weight: bold;}
+
 #debug-console-footer {
-    padding: 3px 5px; text-align: right; flex-shrink: 0; border-top: 1px solid var(--border-dark);
+    padding: 3px 5px;
+    text-align: right;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-dark);
+    background-color: var(--debug-bg); /* Match background */
 }
+
 #copyLogBtn {
     font-size: 0.7em; padding: 2px 5px; background-color: var(--button-bg); color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px; cursor: pointer;
 }
 #copyLogBtn:hover { background-color: var(--button-hover-bg); }
 
 
+/* --- Object List Styling --- */
+#object-management-section {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+#object-management-section h4 {
+    margin: 0 0 5px 0;
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--text-heading-purple); /* Match other headings */
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 3px;
+}
+
+#object-list-container {
+    max-height: 150px; /* Limit height, make scrollable */
+    overflow-y: auto;
+    background-color: var(--control-bg-dark); /* Slightly different bg */
+    border: 1px solid var(--control-border-dark);
+    border-radius: 3px;
+    padding: 5px;
+}
+
+#objectList { list-style: none; padding: 0; margin: 0; }
+#objectList li {
+    padding: 5px 8px; margin-bottom: 3px; background-color: var(--button-bg);
+    border: 1px solid transparent; border-radius: 3px; cursor: pointer;
+    font-size: 0.85em; display: flex; justify-content: space-between; align-items: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+#objectList li:hover { background-color: var(--button-hover-bg); }
+#objectList li.selected {
+    background-color: var(--list-selected-bg); border-color: var(--text-label-pink); font-weight: bold;
+}
+#objectList li span.object-name {
+    flex-grow: 1; margin-right: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#objectList li button.delete-object-btn {
+    flex-shrink: 0; background: none; border: none; color: var(--debug-error-text);
+    font-size: 1.1em; font-weight: bold; padding: 0 5px; cursor: pointer; line-height: 1; opacity: 0.7;
+}
+#objectList li button.delete-object-btn:hover { opacity: 1.0; color: #ff4d4d; }
+#objectList li.placeholder {
+    font-style: italic; color: var(--debug-text); background-color: transparent;
+    text-align: center; cursor: default; justify-content: center;
+}
+#objectList li.placeholder:hover { background-color: transparent; }
+#objectList li.placeholder button.delete-object-btn { display: none; }
+
+/* --- Gizmo Button Styling --- */
+.gizmo-controls { justify-content: center; margin-top: 8px; margin-bottom: 5px; }
+.gizmo-controls label { flex-basis: auto; margin-right: 10px; color: var(--text-label-pink); }
+.gizmo-controls > div { display: flex; gap: 5px; }
+button.gizmo-btn {
+    padding: 5px 10px; font-size: 0.8em; min-width: 35px; background-color: var(--button-bg);
+    color: var(--text-light); border: 1px solid var(--button-border); border-radius: 3px;
+    cursor: pointer; font-weight: bold;
+}
+button.gizmo-btn:hover { background-color: var(--button-hover-bg); }
+button.gizmo-btn.active { background-color: var(--list-selected-bg); border-color: var(--text-label-pink); }
+#gizmoDetachBtn { opacity: 0.8; }
+#gizmoDetachBtn:hover { opacity: 1.0; }
+
+/* --- Camera Control Button Styling --- */
+#focusCameraBtn, #decoupleCameraBtn {
+    padding: 4px 8px; font-size: 0.8em; /* Match other header buttons */
+}
+#decoupleCameraBtn.decoupled {
+    background-color: var(--list-selected-bg); border-color: var(--text-label-pink);
+}
+
 /* ====================================================== */
 /* --- Landscape Layout (Sidebar on Right) --- */
 /* ====================================================== */
-/* Apply when orientation is landscape AND min-width is reasonable */
 @media screen and (orientation: landscape) and (min-width: 768px) {
 
-    body {
-        flex-direction: row; /* Scene first, then controls */
-    }
+    body { flex-direction: row; }
 
-    #scene-container {
-        /* Already flex: 1 1 auto; min-width: 0; */
-        height: 100%; /* Ensure full height */
-        min-height: initial; /* Override base min-height */
-    }
+    #scene-container { height: 100%; min-height: initial; }
 
     #controls-container {
-        /* Sidebar sizing - Non-flexible width */
-        flex: none; /* Disable flex grow/shrink */
-        width: 380px; /* Explicit width */
-        height: 100%; /* Fill full height */
-        max-height: 100%; /* Override portrait max-height */
-        min-height: initial; /* Override base min-height */
-
-        /* Corrected border placement for right sidebar */
-        border-top: none;
-        border-left: 1px solid var(--border-dark);
-        border-right: none;
-
-        /* Padding and overflow */
-        padding: 0 10px 15px 10px;
-        overflow-y: auto;
-        overflow-x: hidden;
-
-        /* Transition width */
-        transition: width 0.3s ease-out, padding 0.3s ease-out, border-color 0.3s ease-out;
+        flex: none; width: 380px; height: 100%; max-height: 100%;
+        min-height: initial; border-top: none; border-left: 1px solid var(--border-dark);
+        border-right: none; padding: 0; /* Remove padding, applied to children */
+        overflow: hidden; /* Main container shouldn't scroll */
+        transition: width 0.3s ease-out, border-color 0.3s ease-out;
     }
 
-
-    /* Adjustments for the sticky header in sidebar mode */
+     /* Header stays fixed at top of sidebar */
     #controls-header {
-        margin: 0 -10px 5px -10px; /* Match new padding */
-        padding-left: 10px;
-        padding-right: 10px;
+        position: relative; /* Change from sticky */
+        margin: 0; /* Remove negative margins */
+        padding: 10px; /* Consistent padding */
         border-bottom: 1px solid var(--border-dark);
+        min-height: auto; /* Allow height to be flexible */
     }
+
+     /* Scroll wrapper takes up remaining space */
+     #controls-scroll-wrapper {
+         flex: 1 1 auto; /* Grow and shrink */
+         padding: 0 10px 10px 10px; /* Padding for scroll content */
+         min-height: 0; /* Allow shrinking */
+         overflow-y: auto; /* Enable scroll */
+     }
+
+      /* Console container at the bottom of the sidebar */
+      #debug-console-container {
+         margin: 0; /* Remove margins */
+         padding: 0 10px 0 10px; /* Inner padding */
+         border-radius: 0; /* No radius */
+         border-top: 1px solid var(--border-dark);
+         border-left: none;
+         border-right: none;
+         border-bottom: none;
+         height: 100px; /* Fixed height in sidebar? Or adjust */
+         max-height: 150px;
+      }
+
 
     /* --- Collapsed State in Landscape --- */
     body.controls-collapsed #controls-container {
-        width: 45px; /* Collapsed width */
-        min-width: 45px; /* Ensure it doesn't go smaller */
-        overflow: hidden;
-        padding: 0;
-        border-left: 1px solid var(--border-dark);
-        /* Override other properties set in base collapsed state if needed */
-        height: 100%;
-        max-height: 100%;
-        min-height: initial;
+        width: 45px; min-width: 45px; padding: 0; border-left: 1px solid var(--border-dark);
+        height: 100%; max-height: 100%; min-height: initial;
     }
 
-    /* Scene takes remaining space automatically */
-
-    /* Hide most header content when collapsed in landscape */
     body.controls-collapsed #controls-header {
-        padding: 5px;
-        margin: 0;
-        border-bottom: none;
-        justify-content: center;
+        padding: 5px; margin: 0; border-bottom: none; justify-content: center;
     }
-    body.controls-collapsed #controls-header > *:not(#toggleControlsBtn) {
-         display: none;
-    }
-    body.controls-collapsed #toggleControlsBtn {
-       /* Optional styling */
-    }
-
+    body.controls-collapsed #controls-header > *:not(#toggleControlsBtn) { display: none; }
+    body.controls-collapsed #controls-scroll-wrapper { display: none; }
+    body.controls-collapsed #debug-console-container { display: none; }
+    /* --- END Collapsed State --- */
 }
 
 /* --- ADD Specific Style for Reset Button --- */
@@ -292,5 +393,4 @@ hr {
     padding: 2px 5px; /* Smaller padding */
     font-size: 1.1em;  /* Slightly larger icon */
     line-height: 1;   /* Adjust line height for vertical centering */
-    /* Override any flex settings if needed, but likely okay */
 }
