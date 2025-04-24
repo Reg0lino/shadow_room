@@ -98,11 +98,11 @@ body {
 
 #controls-header-left {
     display: flex;
-    gap: 8px; /* Adjust gap as needed */
+    gap: 4px; /* Reduced gap */
     align-items: center;
     flex-wrap: wrap; /* Allow buttons to wrap */
     flex-grow: 1; /* Allow left side to take available space */
-    padding-bottom: 2px; /* Add slight padding if wrapping occurs */
+    padding-bottom: 0; /* Removed bottom padding */
 }
 #controls-header > button#toggleControlsBtn {
      flex-shrink: 0; /* Prevent collapse button shrinking */
@@ -110,10 +110,14 @@ body {
 }
 
 
-/* Common button styles in header */
-#controls-header button {
-    padding: 4px 8px;
-    font-size: 0.8em;
+/* Common button styles in header - Made Smaller */
+#controls-header button,
+#controls-header-left button, /* Target buttons inside left group specifically */
+#controls-header select, /* Include select if needed */
+#controls-header label /* Include labels if needed */
+{
+    padding: 3px 6px !important; /* Reduced padding */
+    font-size: 0.75em !important; /* Reduced font size */
     cursor: pointer;
     background-color: var(--button-bg);
     color: var(--text-light);
@@ -121,6 +125,9 @@ body {
     border-radius: 3px;
     white-space: nowrap;
     margin-bottom: 2px; /* Add spacing when wrapped */
+    min-height: 28px !important; /* Reduced min height */
+    min-width: 28px !important; /* Reduced min width */
+    line-height: 1.1 !important; /* Adjusted line height */
 }
 #controls-header button:hover {
     background-color: var(--button-hover-bg);
@@ -401,12 +408,21 @@ button.gizmo-btn.active { background-color: var(--list-selected-bg); border-colo
 
 /* --- Touch-friendly controls for mobile --- */
 @media (max-width: 600px), (pointer: coarse) {
+    /* Keep header buttons small even on touch */
     #controls-header button,
+    #controls-header-left button,
+    #controls-header select,
+    #controls-header label {
+        min-height: 36px !important; /* Slightly larger touch target for header */
+        min-width: 36px !important;
+        font-size: 0.8em !important; /* Slightly larger font for header on touch */
+        padding: 4px 8px !important;
+    }
+
+    /* Adjust other controls for touch */
     #controls-scroll-wrapper button,
     .reset-slider-btn,
-    #resetObjectBtn,
-    #focusCameraBtn,
-    #decoupleCameraBtn {
+    #resetObjectBtn {
         min-height: 44px;
         min-width: 44px;
         font-size: 1.1em;

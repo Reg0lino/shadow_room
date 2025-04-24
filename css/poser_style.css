@@ -1,292 +1,277 @@
-/* --- Base Styles & Dark Mode Variables (Adapted from style.css) --- */
-:root {
-    --bg-dark-main: #1a1a1a;
-    --bg-dark-controls: #2a2a2a;
-    --bg-info-panel: rgba(42, 42, 42, 0.9); /* Slightly transparent dark */
-    --text-light: #e0e0e0;
-    --text-label-pink: #ff80cc;
-    --border-dark: #444;
-    --border-light: #ccc;
-    --control-bg-dark: #333;
-    --button-bg: #4a4a4a;
-    --button-border: #666;
-    --button-hover-bg: #5a5a5a;
-    --list-hover-bg: #383838;
-    --list-selected-bg: #004a99; /* Darker blue for selection */
-    --error-text: #ff8080;
-    --success-text: #80ff80;
-}
+/* START OF FILE poser_style.css */
 
+/* Base Styles & Dark Theme */
 html, body {
-    margin: 0;
-    padding: 0;
     height: 100%;
     width: 100%;
-    overflow: hidden; /* Prevent scrollbars on body */
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
     font-family: sans-serif;
-    background-color: var(--bg-dark); /* Ensure body background */
+    background: #232323;
+    color: #f0f0f0;
+    overflow: hidden;
 }
 
+/* --- Flexbox Layout (#controls top, #container middle, #componentsInfo potentially bottom) --- */
 body {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
 }
 
-/* --- Top Controls Bar --- */
-#controls {
-    flex: 0 0 auto; /* Don't grow or shrink, height determined by content */
-    padding: 15px; /* Increased padding */
-    background-color: var(--bg-dark-controls);
-    border-bottom: 1px solid var(--border-dark);
+#wrapper {
     display: flex;
-    gap: 12px; /* Increased gap */
+    flex-direction: column;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* --- Top Controls Bar (#controls) --- */
+#controls {
+    background: #2a2a2a;
+    color: #fff;
+    padding: 5px 10px; /* Keep padding reasonable */
+    font-size: 1.05em; /* Base size for controls */
+    border-bottom: 1px solid #444;
+    z-index: 20;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap; /* Allow wrapping */
     align-items: center;
-    flex-wrap: wrap; /* Allow controls to wrap */
-    position: relative; /* Ensure z-index works reliably */
-    z-index: 20; /* Keep above info panel in portrait */
-    min-height: 40px; /* Ensure a minimum touchable height */
-}
-
-#controls label {
-    color: var(--text-label-pink);
-    font-size: 1em; /* Slightly larger label font */
-}
-
-#controls select,
-#controls button {
-    padding: 8px 12px; /* Increased padding */
-    font-size: 1em; /* Larger font size */
-    background-color: var(--button-bg);
-    color: var(--text-light);
-    border: 1px solid var(--button-border);
-    border-radius: 4px; /* Slightly larger radius */
-    cursor: pointer;
-    min-height: 38px; /* Ensure minimum button height */
+    width: 100%;
+    height: auto;
+    gap: 5px 10px; /* Row gap, Column gap */
     box-sizing: border-box;
+    overflow-y: hidden;
 }
+
+#controls .controls-group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+}
+
+#controls label,
+#controls select,
+#controls button,
+#controls span {
+    font-size: 1em; /* Relative to #controls */
+    white-space: nowrap;
+    margin: 2px 0;
+}
+
+#controls button,
 #controls select {
-     appearance: none;
-     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23CCCCCC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.3-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
-     background-repeat: no-repeat; background-position: right 12px top 50%; background-size: .75em auto; padding-right: 35px; /* Adjust padding for larger arrow */
+    padding: 7px 12px;
+    font-size: 1em; /* Relative to #controls */
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+    min-width: 40px;
+    min-height: 40px;
+    line-height: 1.1;
+    display: inline-flex;
+    align-items: center; /* Vertical center */
+    justify-content: center; /* Horizontal center */
+    text-align: center; /* Text align center */
 }
-
-
-#controls button:hover {
-    background-color: var(--button-hover-bg);
-}
-
 #controls button:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
 }
-
-#controls button.active { /* Style for active transform button */
-    background-color: var(--list-selected-bg);
-    border-color: var(--text-label-pink);
+#controls button:hover:not(:disabled) {
+    background: #666;
 }
+/* Style for active transform button */
+#controls button.transform-btn.active {
+     background-color: #004a99; /* Use selection color */
+     border-color: #77aaff;
+     font-weight: bold;
+}
+
 
 #transformModeControls {
-    display: flex;
-    gap: 8px; /* Increased gap */
-    align-items: center;
-    margin-left: 15px; /* Increased margin */
+     /* First group, aligns left automatically */
 }
-#transformModeControls span {
-    font-size: 1em; /* Match button font size */
+#transformModeControls button {
+    padding: 6px 10px;
+    font-size: 0.95em;
 }
 
 
-/* --- Main 3D View Container --- */
+/* --- Middle Canvas Container (#container) --- */
 #container {
-    flex: 1 1 auto; /* Allow container to grow and shrink, taking remaining space */
-    position: relative; /* Crucial for absolute positioning of children */
-    overflow: hidden; /* Prevent internal scrollbars if content overflows */
-    display: flex; /* Use flex for potential internal layout */
-    min-height: 0; /* Prevent flex item from overflowing body in some cases */
-    background-color: #cccccc; /* Default light background for contrast */
+    flex: 1 1 auto;
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background: #232323;
     min-width: 0;
+    min-height: 0;
 }
 
 canvas {
     display: block;
-    width: 100% !important;
-    height: 100% !important;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1;
+    background: #232323;
 }
 
-/* --- Info Overlay (Top Left) --- */
+/* --- Top-Left Info Text (#info) --- */
 #info {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 8px 15px;
+    top: 8px;
+    left: 8px;
+    background: rgba(40,40,40,0.92);
+    color: #fff;
+    padding: 6px 11px;
     border-radius: 5px;
-    z-index: 10; /* Below controls, above components */
-    font-size: 0.9em;
-    max-width: calc(100% - 30px); /* Prevent overlap with potential sidebar */
-    border: 1px solid var(--border-dark);
-}
-
-#info.error {
-    background-color: rgba(180, 0, 0, 0.8);
-}
-
-#info.success {
-    background-color: rgba(0, 128, 0, 0.8);
-}
-
-#info.loading {
-    background-color: rgba(0, 0, 128, 0.8);
-}
-
-
-/* --- Components Info Panel (Right/Bottom) --- */
-#componentsInfo {
-    position: absolute; /* Position relative to #container */
-    background: var(--bg-info-panel);
-    color: var(--text-light);
-    padding: 10px;
-    border-radius: 5px;
-    z-index: 15; /* Above #info if overlapping, below #controls */
-    box-sizing: border-box;
-    overflow-y: auto;
-    display: none; /* Initially hidden, controlled by JS */
-
-    /* Default (Portrait / Mobile First): Positioned at Bottom */
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 33vh; /* Approx 1/3 of viewport height */
-    border-top: 1px solid var(--border-dark);
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    border-radius: 5px 5px 0 0; /* Rounded top corners */
-}
-
-#componentsInfo h3, #componentsInfo h4 {
-    margin-top: 0;
-    margin-bottom: 8px;
     font-size: 1em;
-    color: var(--text-heading-purple);
-    border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 4px;
+    z-index: 25;
+    pointer-events: none;
+    max-width: calc(100% - 16px);
 }
-#componentsInfo h4 {
-    font-size: 0.9em;
-    color: var(--text-label-pink);
-    margin-top: 15px;
+#info.error { color: #ff8080; }
+#info.success { color: #80ff80; }
+#info.loading { color: #ffe080; }
+
+/* --- Components Panel (#componentsInfo) --- */
+/* Default: Desktop/Landscape - Absolute Overlay */
+#componentsInfo {
+    position: absolute;
+    right: 12px;
+    top: 15px;
+    background: rgba(30,30,30,0.98);
+    color: #fff;
+    padding: 15px 12px 15px 14px;
+    border-radius: 8px;
+    font-size: 1.05em; /* Base desktop font size */
+    width: auto;
+    max-width: 420px;
+    height: auto;
+    max-height: calc(100vh - 30px - 75px); /* Adjusted calculation slightly */
+    overflow-y: auto;
+    z-index: 30;
+    box-shadow: 0 2px 16px #000a;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    display: block;
 }
 
+#componentsInfo h3, #componentsInfo h4, #componentsInfo summary {
+    font-size: 1.1em; /* Relative */
+    color: #c080ff;
+    margin: 8px 0 4px 0;
+}
 #componentsInfo ul {
-    list-style: none;
+    margin: 0 0 8px 16px;
     padding: 0;
-    margin: 0;
+    font-size: 1em; /* Relative */
 }
-
 #componentsInfo li {
-    margin-bottom: 5px;
-    padding: 4px 6px;
-    border-bottom: 1px solid var(--border-dark);
-    word-wrap: break-word;
+    margin-bottom: 3px;
+    font-size: 1em; /* Relative */
+    padding: 3px 5px;
     cursor: pointer;
-    font-size: 0.85em;
-    transition: background-color 0.2s ease;
-}
-
-#componentsInfo li:hover {
-    background-color: var(--list-hover-bg);
-}
-
-#componentsInfo li.selected {
-    background-color: var(--list-selected-bg);
-    font-weight: bold;
-    color: white;
-}
-
-#componentsInfo li.error {
-    color: var(--error-text);
-    font-style: italic;
-}
-
-#componentsInfo details > summary {
-    cursor: pointer;
-    font-weight: bold;
-    margin: 5px 0;
-    padding: 4px 6px;
-    background-color: var(--button-bg);
     border-radius: 3px;
-    font-size: 0.9em;
-    transition: background-color 0.2s ease;
 }
-#componentsInfo details > summary:hover {
-    background-color: var(--button-hover-bg);
+#boneListContainer li.selected {
+    background: #004a99;
+    color: #fff;
+    font-weight: bold;
 }
-#componentsInfo details[open] > summary {
-     background-color: var(--list-selected-bg);
-     color: white;
+
+details > summary {
+    cursor: pointer;
+    padding: 3px 0;
+    font-weight: 500;
 }
-#componentsInfo details ul { /* Indent finger list */
-    margin-left: 15px;
-    margin-top: 5px;
+details[open] > summary {
+    font-weight: bold;
+    margin-bottom: 4px;
 }
 
 
-/* ====================================================== */
-/* --- Landscape Layout Adjustments --- */
-/* ====================================================== */
+/* --- Responsive: Mobile/Portrait --- */
+/* Apply bottom-docked style for #componentsInfo */
+@media (max-width: 767px), (orientation: portrait) {
 
-/* Landscape - General (Applies to phones/tablets in landscape) */
-@media screen and (orientation: landscape) {
+    #container {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
     #componentsInfo {
-        /* Keep at bottom, but reduce height */
-        height: 30vh; /* Make slightly shorter in landscape */
-        /* Ensure width is still full */
-        left: 0;
-        right: 0;
-        top: auto; /* Ensure top is not set */
-        width: auto; /* Ensure width is not fixed */
-        border-left: none; /* Remove potential side border */
-        border-radius: 5px 5px 0 0; /* Keep top rounded corners */
+        /* Override to Dock at Bottom */
+        position: relative;
+        order: 3;
+        width: 100%;
+        max-width: none;
+        height: auto;
+        max-height: 45vh; /* Slightly increased max-height */
+        border-top: 1px solid #444;
+        border-radius: 0;
+        box-shadow: none;
+        background: #282828;
+        z-index: 15;
+        flex-shrink: 0;
+        padding: 12px 14px 12px 16px; /* Increased padding */
+        top: auto;
+        right: auto;
+
+        /* <<< Mobile Font Size Adjustments >>> */
+        font-size: 1.2em; /* Significantly larger base font */
     }
+
+    #componentsInfo h3, #componentsInfo h4, #componentsInfo summary {
+        font-size: 1.15em; /* Larger headings */
+        margin: 10px 0 5px 0; /* Adjust margin */
+    }
+    #componentsInfo ul {
+        margin: 0 0 10px 18px; /* Adjust margin */
+        font-size: 1.1em; /* Larger list font */
+    }
+     #componentsInfo li {
+        padding: 6px 8px; /* Much larger padding for touch */
+        margin-bottom: 4px; /* Increase spacing */
+        font-size: 1.1em; /* Larger list item text */
+        /* <<< Centering List Item Text >>> */
+        display: flex;
+        justify-content: center;
+        text-align: center;
+     }
+     #boneListContainer li.selected {
+         /* Keep selection style */
+     }
+
+     /* Adjust top controls touch targets for mobile */
+     #controls {
+         padding: 6px 10px; /* Adjust padding */
+         gap: 6px 12px; /* Adjust gap */
+     }
+    #controls button, #controls select {
+        min-width: 44px; /* Ensure larger touch target */
+        min-height: 44px;
+        padding: 9px 13px; /* Adjust padding */
+        font-size: 1.05em; /* Slightly larger font in buttons */
+     }
+      #transformModeControls button {
+        padding: 8px 11px; /* Adjust padding */
+     }
 }
 
-/* Landscape - Larger Screens (Sidebar layout) */
-/* Only apply sidebar layout if there's enough width */
-@media screen and (orientation: landscape) and (min-width: 768px) {
-    /* --- REMOVE body flex-direction change --- */
-    /*
-    body {
-        flex-direction: row;
-    }
-    */
-
-    /* --- REMOVE controls order change --- */
-    /*
-    #controls {
-        order: -1;
-    }
-    */
-
-    /* --- Ensure container takes space correctly (already set outside media query) --- */
-    /* #container should already have flex: 1 1 auto; */
-
-
-    /* Components Info becomes a right sidebar in landscape */
-    #componentsInfo {
-        /* Keep absolute positioning relative to #container */
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        bottom: 10px; /* Adjust bottom */
-        left: auto; /* Reset left */
-        width: 280px; /* Fixed width sidebar */
-        height: auto; /* Height determined by top/bottom */
-        max-height: none; /* Ensure no max-height limit in landscape */
-        border-top: none;
-        border-left: 1px solid var(--border-dark); /* Add left border */
-        border-radius: 5px; /* Standard border radius */
-    }
-}
+/* END OF FILE poser_style.css */
