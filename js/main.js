@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import * as Primitives from './shapes/primitives.js';
 import * as Wireframes from './shapes/wireframes.js';
 import * as Variations from './shapes/variations.js';
@@ -89,7 +88,6 @@ let spotLight, lightTarget, lightVisualizer;
 let floor, gridHelper, axesHelper; // axesHelper itself remains for visibility control
 let sceneObjects = [];
 let selectedObjectUUID = null;
-let transformControls;
 let objectMaterial;
 let floorBaseMaterial;
 let originalShapeOptions = [];
@@ -104,7 +102,6 @@ let focusCameraBtn;
 let decoupleCameraBtn;
 let isCameraDecoupled = false;
 let raycaster;
-// Removed axesHelperToggle variable
 
 // --- DOM Elements ---
 let sceneContainer, controlsContainer, toggleControlsBtn, shapeSelect, shapeSearchInput, refreshShapeListBtn, copyLogBtn;
@@ -764,14 +761,10 @@ function updateSliderValuesFromObject() {
             objectRoughnessValueSpan.textContent = representativeMaterial.roughness.toFixed(2);
             objectMetalnessValueSpan.textContent = representativeMaterial.metalness.toFixed(2);
 
-            // Dispatch events only if NOT dragging gizmo (prevents potential loop/stutter)
-            // AND if sliders are enabled
-            if (!transformControls?.dragging) {
-                 if(!modelColorHueSlider.disabled) modelColorHueSlider.dispatchEvent(new Event('input'));
-                 if(!objectBrightnessSlider.disabled) objectBrightnessSlider.dispatchEvent(new Event('input'));
-                 objectRoughnessSlider.dispatchEvent(new Event('input'));
-                 objectMetalnessSlider.dispatchEvent(new Event('input'));
-             }
+            if(!modelColorHueSlider.disabled) modelColorHueSlider.dispatchEvent(new Event('input'));
+            if(!objectBrightnessSlider.disabled) objectBrightnessSlider.dispatchEvent(new Event('input'));
+            objectRoughnessSlider.dispatchEvent(new Event('input'));
+            objectMetalnessSlider.dispatchEvent(new Event('input'));
         }
     }
 
@@ -795,10 +788,6 @@ function updateSliderValuesFromObject() {
             modelYOffsetSlider.value = currentOffset; // Update slider value
             // Update span directly
              if(modelYOffsetValueSpan) modelYOffsetValueSpan.textContent = currentOffset.toFixed(1);
-             // Dispatch event if not dragging
-             if (!transformControls?.dragging) {
-                 // modelYOffsetSlider.dispatchEvent(new Event('input')); // Don't dispatch, causes feedback loop
-             }
         }
         // Rotation
         if (objectRotationXSlider) {
@@ -808,12 +797,6 @@ function updateSliderValuesFromObject() {
             objectRotationZSlider.value = THREE.MathUtils.radToDeg(euler.z);
             // Update spans directly
             updateObjectRotationDisplay();
-            // Dispatch event if not dragging
-             if (!transformControls?.dragging) {
-                 // objectRotationXSlider.dispatchEvent(new Event('input')); // Don't dispatch
-                 // objectRotationYSlider.dispatchEvent(new Event('input')); // Don't dispatch
-                 // objectRotationZSlider.dispatchEvent(new Event('input')); // Don't dispatch
-             }
         }
         // Scale
         if (objectScaleSlider) {
@@ -822,15 +805,11 @@ function updateSliderValuesFromObject() {
             objectScaleSlider.value = scaleValue;
             // Update span directly
             if(objectScaleValueSpan) objectScaleValueSpan.textContent = scaleValue.toFixed(2) + 'x';
-            // Dispatch event if not dragging
-             if (!transformControls?.dragging) {
-                 // objectScaleSlider.dispatchEvent(new Event('input')); // Don't dispatch
-             }
         }
     } else {
         // No object selected - Reset sliders to default visual state?
         // Resetting values might be confusing, just ensure they reflect the base material
-        if (objectMaterial && !transformControls?.dragging) { // Only if not dragging
+        if (objectMaterial) { // Only if not dragging
              const hsl = {h:0, s:0, l:0};
              objectMaterial.color.getHSL(hsl);
              if (modelColorHueSlider) modelColorHueSlider.value = hsl.h;
@@ -843,11 +822,11 @@ function updateSliderValuesFromObject() {
              if (objectMetalnessSlider) objectMetalnessSlider.dispatchEvent(new Event('input'));
         }
         // Reset transform sliders visuals
-        if (modelYOffsetSlider && !transformControls?.dragging) { modelYOffsetSlider.value = 0; modelYOffsetSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationXSlider && !transformControls?.dragging) { objectRotationXSlider.value = 0; objectRotationXSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationYSlider && !transformControls?.dragging) { objectRotationYSlider.value = 0; objectRotationYSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationZSlider && !transformControls?.dragging) { objectRotationZSlider.value = 0; objectRotationZSlider.dispatchEvent(new Event('input'));}
-        if (objectScaleSlider && !transformControls?.dragging) { objectScaleSlider.value = 1; objectScaleSlider.dispatchEvent(new Event('input'));}
+        if (modelYOffsetSlider) { modelYOffsetSlider.value = 0; modelYOffsetSlider.dispatchEvent(new Event('input'));}
+        if (objectRotationXSlider) { objectRotationXSlider.value = 0; objectRotationXSlider.dispatchEvent(new Event('input'));}
+        if (objectRotationYSlider) { objectRotationYSlider.value = 0; objectRotationYSlider.dispatchEvent(new Event('input'));}
+        if (objectRotationZSlider) { objectRotationZSlider.value = 0; objectRotationZSlider.dispatchEvent(new Event('input'));}
+        if (objectScaleSlider) { objectScaleSlider.value = 1; objectScaleSlider.dispatchEvent(new Event('input'));}
     }
 }
 
@@ -1177,7 +1156,6 @@ function populateObjectList() {
             event.stopPropagation(); // Prevent li click event from firing
             // Confirmation before deleting
             if (window.confirm(`Are you sure you want to delete "${displayName}"?`)) {
-                // Ensure 'deleteObject' is spelled correctly and accessible in scope
                 deleteObject(objData.uuid);
             }
         });
@@ -1199,48 +1177,12 @@ function populateObjectList() {
 }
 
 function selectObject(uuidToSelect) {
-    // --- Existing selection logic ---
-    if (selectedObjectUUID === uuidToSelect) {
-        // If already selected, ensure gizmo is attached if it somehow got detached
-        const selectedObjData = sceneObjects.find(obj => obj.uuid === selectedObjectUUID);
-         if (selectedObjData?.object3D && transformControls && transformControls.object !== selectedObjData.object3D) {
-             logToPage(`Re-attaching gizmo to object: ${selectedObjData.object3D.name || selectedObjectUUID} (Visible: ${selectedObjData.object3D.visible}, Parent: ${selectedObjData.object3D.parent?.type})`);
-             transformControls.attach(selectedObjData.object3D);
-             transformControls.visible = true; // Force visibility on re-attach
-             transformControls.enabled = true; // Force enabled on re-attach
-             setGizmoMode(transformControls.mode || 'translate');
-         } else if (transformControls && !transformControls.visible && transformControls.object) {
-             // If same object selected but gizmo somehow hidden, try showing it
-              transformControls.visible = true;
-              transformControls.enabled = true;
-              logToPage(`Forcing gizmo visible for already selected object ${selectedObjectUUID}.`);
-         }
-        updateSliderValuesFromObject();
-        return;
-    }
-
+    if (selectedObjectUUID === uuidToSelect) return;
     selectedObjectUUID = uuidToSelect;
-
-    if(selectedObjectUUID) {
-        logToPage(`Selected object UUID: ${selectedObjectUUID}`);
-    } else {
-        logToPage("Deselected object.");
-    }
-
     populateObjectList();
-
     const selectedObjData = sceneObjects.find(obj => obj.uuid === selectedObjectUUID);
 
     if (selectedObjData?.object3D) {
-        if (transformControls) {
-             logToPage(`Attaching gizmo to object: ${selectedObjData.object3D.name || selectedObjectUUID} (Visible: ${selectedObjData.object3D.visible}, Parent: ${selectedObjData.object3D.parent?.type})`);
-             transformControls.attach(selectedObjData.object3D);
-             // --- Force Gizmo State ---
-             transformControls.visible = true; // Explicitly set visible
-             transformControls.enabled = true; // Explicitly set enabled
-             // --- End Force State ---
-             setGizmoMode(transformControls.mode || 'translate');
-        }
         updateTargets();
         const isPoseable = selectedObjData.isPoseable;
         if(openPoserBtn) openPoserBtn.disabled = !isPoseable;
@@ -1261,7 +1203,6 @@ function selectObject(uuidToSelect) {
             logToPage(`Selected object data or 3D object not found for UUID: ${uuidToSelect}`, 'error');
         }
         selectedObjectUUID = null;
-        detachGizmo(); // Handles detaching and hiding
         if(openPoserBtn) openPoserBtn.disabled = true;
         if(poseSelect) poseSelect.disabled = true;
         if(refreshPosesBtn) refreshPosesBtn.disabled = true;
@@ -1272,6 +1213,25 @@ function selectObject(uuidToSelect) {
     }
 }
 
+function deleteObject(uuid) {
+    // Remove from sceneObjects
+    const idx = sceneObjects.findIndex(obj => obj.uuid === uuid);
+    if (idx === -1) return;
+    const objData = sceneObjects[idx];
+    // Remove from scene
+    if (objData.object3D && objData.object3D.parent) {
+        objData.object3D.parent.remove(objData.object3D);
+    }
+    // Remove from array
+    sceneObjects.splice(idx, 1);
+    // Deselect if it was selected
+    if (selectedObjectUUID === uuid) {
+        selectedObjectUUID = null;
+    }
+    populateObjectList();
+    updateSliderValuesFromObject();
+    updateTargets();
+}
 
 // --- END OBJECT MANAGEMENT FUNCTIONS ---
 
@@ -1364,25 +1324,15 @@ async function init() { // Make init async
         controls.maxPolarAngle = Math.PI / 2 - 0.01;
         controls.minDistance = 2; controls.maxDistance = 50;
         controls.update();
+        /*
+            Mobile/Touch support:
+            - OrbitControls supports pinch-to-zoom, pan, and orbit by default.
+            - In Chrome DevTools mobile emulation, use Shift+drag to simulate pinch/zoom.
+            - Scroll wheel does NOT simulate pinch/zoom in mobile emulation.
+            - On real mobile devices, pinch/zoom and pan work as expected.
+        */
         logToPage("OrbitControls added.");
-
-        // --- Initialize Transform Controls (Gizmo) ---
-        transformControls = new TransformControls(camera, renderer.domElement);
-        transformControls.addEventListener('dragging-changed', function (event) {
-            controls.enabled = !event.value; // Disable OrbitControls while dragging gizmo
-        });
-        transformControls.addEventListener('objectChange', () => {
-            updateSliderValuesFromObject();
-            if(transformControls.mode === 'scale' || transformControls.mode === 'translate') {
-                updateTargets();
-            }
-       });
-        logToPage("TransformControls (Gizmo) initialized.");
-        // Add the internal visual and interaction helpers to the scene
-        scene.add(transformControls.gizmo);
-        scene.add(transformControls.picker); // Picker is used for raycasting interactions with the gizmo
-        logToPage("Added transformControls.gizmo and transformControls.picker to the scene.");
-        // --- End Transform Controls Init ---
+        logToPage("Tip: Pinch-to-zoom and touch gestures work on real mobile devices. Chrome mobile emulation does not support pinch for 3D view.", "info");
 
         // --- Shared Object Material ---
         objectMaterial = new THREE.MeshStandardMaterial({
@@ -1447,13 +1397,8 @@ async function init() { // Make init async
              }
          });
         renderer.domElement.addEventListener('click', onSceneClick, false);
-        document.getElementById('gizmoTranslateBtn')?.addEventListener('click', () => setGizmoMode('translate'));
-        document.getElementById('gizmoRotateBtn')?.addEventListener('click', () => setGizmoMode('rotate'));
-        document.getElementById('gizmoScaleBtn')?.addEventListener('click', () => setGizmoMode('scale'));
-        document.getElementById('gizmoDetachBtn')?.addEventListener('click', () => detachGizmo());
         focusCameraBtn?.addEventListener('click', () => focusCameraOnSelection(false));
         decoupleCameraBtn?.addEventListener('click', toggleCameraDecoupling);
-        window.addEventListener('keydown', handleGizmoKeyDown);
         logToPage("Event listeners added.");
 
         // --- Apply Initial State ---
@@ -1498,10 +1443,6 @@ function onWindowResize() {
 function onSceneClick(event) {
     if (!raycaster || !camera || !sceneObjects || sceneObjects.length === 0) return;
 
-    if (transformControls?.dragging) {
-        return; // Ignore clicks while dragging gizmo
-    }
-
     const mouse = new THREE.Vector2();
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1544,131 +1485,26 @@ function onSceneClick(event) {
     }
 }
 
-function handleGizmoKeyDown(event) {
-     // Ignore if modifier keys are pressed or if typing in input
-     if (event.ctrlKey || event.metaKey || event.altKey || // Allow Shift for multi-select later?
-         (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName))) {
-         return;
-     }
-
-     // Only handle gizmo keys if a gizmo is potentially active (attached)
-     if (!transformControls || !transformControls.object) {
-          // Allow Esc/Q to potentially close panels even if gizmo not attached? No, keep focus on gizmo.
-          // logToPage(`Gizmo key '${event.key}' ignored: Gizmo not attached.`);
-          return;
-     }
-
-     let handled = false;
-     switch (event.key.toLowerCase()) {
-         case 'w': // Translate
-             setGizmoMode('translate');
-             handled = true;
-             break;
-         case 'e': // Rotate
-             setGizmoMode('rotate');
-              handled = true;
-             break;
-         case 'r': // Scale (Use R, more common)
-             setGizmoMode('scale');
-              handled = true;
-             break;
-         case 's': // Scale (Alternative)
-              setGizmoMode('scale');
-               handled = true;
-              break;
-         case 'escape': // Detach
-         case 'q': // Detach (Alternative)
-             detachGizmo();
-             // Also deselect the object when detaching via keyboard? Optional.
-             // selectObject(null);
-              handled = true;
-             break;
-     }
-
-     if (handled) {
-          event.preventDefault(); // Prevent default browser actions (like page reload for R)
-          event.stopPropagation(); // Stop event from bubbling further
-          // logToPage(`Gizmo mode changed via key: ${event.key}`); // Too noisy
-     }
-}
-
-function setGizmoMode(mode) {
-    if (!transformControls) return;
-    transformControls.setMode(mode);
-    // logToPage(`Gizmo mode set to: ${mode}`); // Too noisy
-    // Update button active states
-    document.querySelectorAll('.gizmo-btn').forEach(btn => {
-        // Handle the detach button separately
-        if(btn.id === 'gizmoDetachBtn') {
-            btn.classList.remove('active'); // Detach button is never "active" state
-            return;
-        }
-        // Highlight the mode button
-        if (btn.dataset.mode === mode) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    // Ensure gizmo is attached if an object is selected
-    const selectedObj3D = getSelectedObject3D();
-    if (selectedObj3D && transformControls.object !== selectedObj3D) {
-         transformControls.attach(selectedObj3D);
-         transformControls.visible = true; // Ensure visible on mode change attach
-         transformControls.enabled = true;
-    } else if (!selectedObj3D) {
-         detachGizmo(); // Detach if no object selected
-    } else if (transformControls.object) {
-         // If already attached, ensure visibility is correct
-         transformControls.visible = true;
-         transformControls.enabled = true;
-    }
-}
-
-// --- Ensure ONLY ONE definition of detachGizmo ---
-function detachGizmo() {
-    if (!transformControls) return;
-    if (transformControls.object) { // Only log/change if attached
-        transformControls.detach();
-        // --- Force Gizmo State ---
-        transformControls.visible = false; // Explicitly hide
-        transformControls.enabled = false; // Explicitly disable
-         // --- End Force State ---
-        document.querySelectorAll('.gizmo-btn.active').forEach(btn => btn.classList.remove('active'));
-        logToPage("Gizmo detached and hidden.");
-    } else {
-        // Ensure state is correct even if already detached
-        transformControls.visible = false;
-        transformControls.enabled = false;
-    }
-}
-
 function handleOpenPoser() {
     logToPage("Open Poser button clicked.");
-    // Use the globally tracked `currentModelPath` which should be set when a poseable object is selected
     if (!currentModelPath) {
         logToPage("Cannot open poser: No poseable model selected.", 'error');
         alert("No poseable model selected. Please select a poseable model from the list or scene first.");
         return;
     }
-
-    // Double-check if the path is actually poseable (belt and suspenders)
     if (!isPoseableModel(currentModelPath)) {
         logToPage(`Cannot open poser: Model '${currentModelPath}' is not designated as poseable.`, 'warn');
         alert("The currently selected object is not designated as a poseable model.");
         return;
     }
-
     const poserUrl = `poser.html?model=${encodeURIComponent(currentModelPath)}`;
     logToPage(`Opening poser for model: ${currentModelPath} at URL: ${poserUrl}`);
-    const poserWindow = window.open(poserUrl, '_blank', 'noopener,noreferrer,width=1000,height=700'); // Suggest size
-
+    const poserWindow = window.open(poserUrl, '_blank');
     if (!poserWindow) {
         logToPage("Failed to open poser window. Pop-up blocker might be active.", 'error');
         alert("Could not open the poser window. Please check if your browser blocked the pop-up and allow pop-ups for this site.");
     } else {
         logToPage("Poser window opened (or attempted).", "success");
-        poserWindow.focus(); // Attempt to focus the new window
     }
 }
 
@@ -1710,8 +1546,6 @@ function resetObjectState() {
      const selectedObj3D = getSelectedObject3D();
      if (!selectedObj3D) {
          logToPage("No object selected to reset.", "info");
-         // Optionally reset sliders anyway?
-         // document.querySelectorAll('#controls-container .reset-slider-btn[data-target-slider^="object"], #controls-container .reset-slider-btn[data-target-slider^="model"]').forEach(btn => btn.click());
          return;
      }
      logToPage(`Resetting state for object: ${selectedObjectUUID}`);
@@ -1761,7 +1595,6 @@ async function resetSceneToDefaults() {
 
         // --- ADD: Clear existing objects ---
         logToPage("Clearing existing scene objects...");
-        detachGizmo();
         selectObject(null);
         while(sceneObjects.length > 0) {
             deleteObject(sceneObjects[sceneObjects.length - 1].uuid);
@@ -1866,11 +1699,6 @@ function onModelYOffsetChange() {
     const selectedObj3D = getSelectedObject3D();
     if (!selectedObj3D || !modelYOffsetSlider || !modelYOffsetValueSpan) return; // Exit if no object selected or sliders missing
 
-    // Only apply slider changes if the gizmo isn't active for translation
-    if(transformControls?.dragging && transformControls.mode === 'translate') {
-        return; // Gizmo takes precedence
-    }
-
     try {
         const offset = parseFloat(modelYOffsetSlider.value);
         modelYOffsetValueSpan.textContent = offset.toFixed(1);
@@ -1883,15 +1711,11 @@ function onModelYOffsetChange() {
              selectedBaseY = -bounds.min.y;
         } else {
              selectedBaseY = selectedObj3D.position.y - offset; // Estimate base Y from current pos and slider
-             // logToPage("Using estimated base Y for Y-offset calc due to bad bounds", "warn"); // Too noisy
         }
 
         selectedObj3D.position.y = selectedBaseY + offset;
 
-        // Update targets ONLY if not dragging gizmo (prevent conflict)
-        if (!transformControls?.dragging) {
-             updateTargets();
-        }
+        updateTargets();
 
     } catch(e){ logToPage(`Y Offset change error: ${e.message}`,'error')}
 }
@@ -1899,11 +1723,6 @@ function onModelYOffsetChange() {
 function onObjectRotationChange() {
     const selectedObj3D = getSelectedObject3D();
     if (!selectedObj3D || !objectRotationXSlider || !objectRotationYSlider || !objectRotationZSlider) return; // Exit if no object selected or sliders missing
-
-    // Only apply slider changes if the gizmo isn't active for rotation
-    if(transformControls?.dragging && transformControls.mode === 'rotate') {
-        return; // Gizmo takes precedence
-    }
 
     try {
         const rxDeg = parseFloat(objectRotationXSlider.value);
@@ -1928,11 +1747,6 @@ function onObjectScaleChange() {
     const selectedObj3D = getSelectedObject3D();
     if (!selectedObj3D || !objectScaleSlider || !objectScaleValueSpan) return; // Exit if no object selected or sliders missing
 
-    // Only apply slider changes if the gizmo isn't active for scaling
-    if(transformControls?.dragging && transformControls.mode === 'scale') {
-        return; // Gizmo takes precedence
-    }
-
     try {
         const scaleValue = parseFloat(objectScaleSlider.value);
         selectedObj3D.scale.set(scaleValue, scaleValue, scaleValue); // Apply uniform scale
@@ -1941,7 +1755,6 @@ function onObjectScaleChange() {
         // Recalculate center and update targets after scaling
         // Also re-apply Y offset as base Y changes with scale
         onModelYOffsetChange(); // Call this to recalculate base Y and apply offset correctly
-        // updateTargets() is called within onModelYOffsetChange
 
     } catch(e) {
         logToPage(`Scale change error: ${e.message}`, 'error');
@@ -2474,7 +2287,6 @@ function toggleCameraDecoupling() {
 
          // --- 1. Clear Existing Scene ---
          logToPage("Clearing current scene...");
-         detachGizmo();
          selectObject(null);
          while(sceneObjects.length > 0) {
               deleteObject(sceneObjects[sceneObjects.length - 1].uuid);
@@ -2630,43 +2442,10 @@ function animate() {
     try {
         requestAnimationFrame(animate);
 
-        // --- Debug Logging for TransformControls ---
-        if (transformControls && transformControls.object) { // Only log if attached
-            const gizmo = transformControls;
-             // Log basic state once per second to avoid flooding
-             if (renderer.info.render.frame % 60 === 0) {
-                 logToPage(`Gizmo state: Mode=${gizmo.mode}, Attached=${gizmo.object?.uuid}, Visible=${gizmo.visible}, Dragging=${gizmo.dragging}, Parent=${gizmo.parent?.type || 'null'}`); // Log parent type
-                 // Let's check internal children too:
-                 logToPage(`Gizmo internal children count: ${gizmo.children?.length}`);
-                 const pickerVisible = gizmo.picker?.visible ?? 'N/A';
-                 const helperVisible = gizmo.helper?.visible ?? 'N/A';
-                 // Check visibility of the main visual sub-components (if they exist)
-                 const translationGroupVisible = gizmo.gizmo?.translate?.visible ?? 'N/A';
-                 const rotationGroupVisible = gizmo.gizmo?.rotate?.visible ?? 'N/A';
-                 const scaleGroupVisible = gizmo.gizmo?.scale?.visible ?? 'N/A';
-
-                 logToPage(`Gizmo internals: PickerVis=${pickerVisible}, HelperVis=${helperVisible}, TranslateVis=${translationGroupVisible}, RotateVis=${rotationGroupVisible}, ScaleVis=${scaleGroupVisible}`);
-
-                 // If children exist, log one of their parents
-                 if (gizmo.children?.length > 0) {
-                    logToPage(`First Gizmo child parent type: ${gizmo.children[0].parent?.type || 'null'}`);
-                 }
-             }
-        }
-        // --- End Debug Logging ---
-
-
-        // Only update OrbitControls if not dragging gizmo AND not locked
-        if (controls.enabled && !transformControls?.dragging) {
+        // Only update OrbitControls if not locked
+        if (controls.enabled) {
              controls.update();
         }
-
-        // --- Update attached object's matrix (might help gizmo positioning) ---
-        // if (transformControls && transformControls.object) {
-        //     transformControls.object.updateMatrixWorld(); // Ensure attached object's matrix is current
-        // }
-        // --- End Update ---
-
 
         renderer.render(scene, camera);
     }

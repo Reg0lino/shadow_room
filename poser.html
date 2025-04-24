@@ -559,7 +559,7 @@
             undoButton.addEventListener('click', undo);
             redoButton.addEventListener('click', redo);
             refreshModelButton.addEventListener('click', refreshModel);
-            backToShadowRoomBtn.addEventListener('click', () => window.close()); // Consider providing feedback or confirmation
+            backToShadowRoomBtn.addEventListener('click', () => window.close()); // Ensure it just closes the poser window
 
             // Transform Controls Buttons
             document.getElementById('translateButton').addEventListener('click', () => transformControls.setMode('translate'));

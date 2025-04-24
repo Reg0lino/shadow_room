@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>3JS Dynamic Pose Explorer - Refactored</title> <!-- Simplified Title -->
 
     <!-- Link to the external CSS file -->
@@ -42,7 +42,8 @@
              <button id="toggleControlsBtn">Collapse</button>
         </div>
 
-        <!-- Scrollable Controls Start Here -->
+        <!-- BEGIN SCROLLABLE WRAPPER -->
+        <div id="controls-scroll-wrapper">
 
         <h3>Light (SpotLight)</h3>
          <div class="control-group">
@@ -300,17 +301,6 @@
             <!-- Add Object is handled by the main shapeSelect dropdown -->
         </div>
         <hr>
-        <!-- NEW: Gizmo Controls -->
-        <div class="control-group gizmo-controls">
-            <label>Manipulate:</label>
-            <div>
-                <button id="gizmoTranslateBtn" class="gizmo-btn" data-mode="translate" title="Translate (W)">T</button>
-                <button id="gizmoRotateBtn" class="gizmo-btn" data-mode="rotate" title="Rotate (E)">R</button>
-                <button id="gizmoScaleBtn" class="gizmo-btn" data-mode="scale" title="Scale (S)">S</button>
-                <button id="gizmoDetachBtn" class="gizmo-btn" title="Detach Gizmo (Esc)">Off</button>
-            </div>
-        </div>
-        <!-- END NEW Section -->
         <!-- Object Transform Controls -->
         <div class="control-group">
             <label for="modelYOffset">Y Offset:</label>
@@ -411,8 +401,11 @@
         </div>
         <hr>
 
-        <!-- Debug Console -->
-        <div id="debug-console-container"></div>
+        </div>
+        <!-- END OF SCROLLABLE CONTENT -->
+
+        <!-- Debug Console (move this OUTSIDE the scroll wrapper, but INSIDE controls-container) -->
+        <div id="debug-console-container">
             <div id="debug-console">
                 <!-- Log messages will appear here -->
             </div>

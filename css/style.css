@@ -70,12 +70,14 @@ body {
 /* Scrollable Content Area (NEW WRAPPER) */
 #controls-scroll-wrapper {
     flex: 1 1 auto; /* Take remaining space between header and console */
-    min-height: 0; /* <<< ADD THIS LINE - Crucial for flex scrolling */
+    min-height: 0; /* <<< Crucial for flex scrolling */
     overflow-y: auto; /* Enable scrolling ONLY for this part */
+    -webkit-overflow-scrolling: touch; /* Enable momentum scroll on iOS */
     padding: 0 15px 10px 15px; /* Inner padding for content */
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overscroll-behavior: contain; /* Prevent scroll chaining from controls panel to body */
 }
 
 
@@ -83,8 +85,6 @@ body {
 #controls-header {
     flex-shrink: 0; /* Prevent header from shrinking */
     position: sticky; /* Make header sticky *within* the scroll wrapper if desired, OR keep it outside */
-    /* Let's keep it outside the scroll wrapper for guaranteed visibility */
-    /* Remove sticky positioning from here if placing outside scroll wrapper */
      padding: 10px 15px 8px 15px; /* Adjust padding */
      background-color: var(--bg-dark-controls);
      border-bottom: 1px solid var(--border-dark);
@@ -209,8 +209,8 @@ hr {
 #debug-console-container {
     flex-shrink: 0; /* Prevent shrinking */
     width: 100%;    /* Take full width of parent */
-    height: 120px; /* Fixed initial height */
-    max-height: 200px; /* Allow resizing up to a point */
+    height: 60px; /* Reduced from 120px */
+    max-height: 80px; /* Reduced from 200px */
     min-height: 40px;  /* Prevent becoming too small */
     background-color: var(--debug-bg);
     border-top: 1px solid var(--border-dark); /* Border on top */
@@ -275,6 +275,8 @@ hr {
     border: 1px solid var(--control-border-dark);
     border-radius: 3px;
     padding: 5px;
+    -webkit-overflow-scrolling: touch; /* Enable momentum scroll on iOS */
+    overscroll-behavior: contain; /* Prevent scroll chaining from controls panel to body */
 }
 
 #objectList { list-style: none; padding: 0; margin: 0; }
@@ -304,6 +306,7 @@ hr {
 #objectList li.placeholder button.delete-object-btn { display: none; }
 
 /* --- Gizmo Button Styling --- */
+/*
 .gizmo-controls { justify-content: center; margin-top: 8px; margin-bottom: 5px; }
 .gizmo-controls label { flex-basis: auto; margin-right: 10px; color: var(--text-label-pink); }
 .gizmo-controls > div { display: flex; gap: 5px; }
@@ -316,6 +319,7 @@ button.gizmo-btn:hover { background-color: var(--button-hover-bg); }
 button.gizmo-btn.active { background-color: var(--list-selected-bg); border-color: var(--text-label-pink); }
 #gizmoDetachBtn { opacity: 0.8; }
 #gizmoDetachBtn:hover { opacity: 1.0; }
+*/
 
 /* --- Camera Control Button Styling --- */
 #focusCameraBtn, #decoupleCameraBtn {
@@ -368,8 +372,8 @@ button.gizmo-btn.active { background-color: var(--list-selected-bg); border-colo
          border-left: none;
          border-right: none;
          border-bottom: none;
-         height: 100px; /* Fixed height in sidebar? Or adjust */
-         max-height: 150px;
+         height: 50px; /* Reduced from 100px */
+         max-height: 70px; /* Reduced from 150px */
       }
 
 
@@ -393,4 +397,33 @@ button.gizmo-btn.active { background-color: var(--list-selected-bg); border-colo
     padding: 2px 5px; /* Smaller padding */
     font-size: 1.1em;  /* Slightly larger icon */
     line-height: 1;   /* Adjust line height for vertical centering */
+}
+
+/* --- Touch-friendly controls for mobile --- */
+@media (max-width: 600px), (pointer: coarse) {
+    #controls-header button,
+    #controls-scroll-wrapper button,
+    .reset-slider-btn,
+    #resetObjectBtn,
+    #focusCameraBtn,
+    #decoupleCameraBtn {
+        min-height: 44px;
+        min-width: 44px;
+        font-size: 1.1em;
+        padding: 10px 12px;
+    }
+    .control-group label {
+        font-size: 1em;
+    }
+    .control-group input[type="range"] {
+        height: 32px;
+    }
+    #shapeSearch {
+        font-size: 1.1em;
+        padding: 10px;
+    }
+    #objectList li {
+        font-size: 1em;
+        padding: 12px 10px;
+    }
 }
