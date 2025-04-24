@@ -1,0 +1,61 @@
+C:\!CODE\shadow_room>tree /f
+Folder PATH listing
+C:.
+¦   .gitignore
+¦   changelog.systemprompt.txt
+¦   directory_structure.txt
+¦   discord readme.txt
+¦   index.html
+¦   Model Components.ini
+¦   poser.html
+¦   readme.md
+¦   shadow_room working version.html
+¦   shadow_room.code-workspace
+¦   shadow_room.html
+¦
++---.github
+¦   +---workflows
+¦           static.yml
+¦
++---.vscode
+¦       launch.json
+¦       settings.json
+¦
++---css
+¦       poser_style.css
+¦       style.css
+¦
++---js
+¦   ¦   main - Stablish.js
+¦   ¦   main-broken.js
+¦   ¦   main.js
+¦   ¦
+¦   +---shapes
+¦           abstract.js
+¦           combinations_basic.js
+¦           combinations_separated.js
+¦           figures_dynamic_animals.js
+¦           figures_dynamic_people.js
+¦           figures_static.js
+¦           objects.js
+¦           primitives.js
+¦           rings_arrays.js
+¦           variations.js
+¦           wireframes.js
+¦
++---models
+    ¦   female_base0.glb
+    ¦   game_character_base.glb
+    ¦   jumping_man.glb
+    ¦   low_poly_people_free_sample_pack.glb
+    ¦   male_base0.glb
+    ¦   male_base1.glb
+    ¦   male_base2.glb
+    ¦
+    +---uploads_files_5843679_Human+GLTF
+        +---Human GLTF
+            +---Textures
+                    Baked body_baseColor.png
+                    Baked body_normal.png
+                    Baked body_occlusionRoughnessMetallic.png
+                    Human Body.bin
