@@ -19,6 +19,8 @@ const POSEABLE_MODELS = [
     'models/game_character_base.glb',
     'models/jumping_man.glb',
     'models/male_base0.glb',
+    'models/femalebase0.glb',
+    'models/malebase0.glb',
     'models/male_base1.glb',
     'models/male_base2.glb'
     // Add more poseable model paths here if needed
@@ -91,7 +93,7 @@ let selectedObjectUUID = null;
 let objectMaterial;
 let floorBaseMaterial;
 let originalShapeOptions = [];
-let objectBaseY = 0;
+// REMOVED Global objectBaseY - Calculate dynamically where needed
 let openPoserBtn;
 let poseSelect;
 let refreshPosesBtn;
@@ -102,6 +104,11 @@ let focusCameraBtn;
 let decoupleCameraBtn;
 let isCameraDecoupled = false;
 let raycaster;
+
+// --- NEW: Free Look Camera State Variables ---
+let isDraggingFreeLook = false;
+let previousMousePosition = { x: 0, y: 0 };
+const freeLookSensitivity = 0.002; // Adjust sensitivity as needed
 
 // --- DOM Elements ---
 let sceneContainer, controlsContainer, toggleControlsBtn, shapeSelect, shapeSearchInput, refreshShapeListBtn, copyLogBtn;
@@ -114,6 +121,8 @@ let wallHueSlider, wallHueValueSpan, wallSaturationSlider, wallSaturationValueSp
 let floorHueSlider, floorHueValueSpan, floorSaturationSlider, floorSaturationValueSpan, floorBrightnessSlider, floorBrightnessValueSpan;
 // Object Sliders
 let modelYOffsetSlider, modelYOffsetValueSpan;
+let objectXPositionSlider, objectXPositionValueSpan; // ADDED
+let objectZPositionSlider, objectZPositionValueSpan; // ADDED
 let objectRotationXSlider, objectRotationXValueSpan, objectRotationYSlider, objectRotationYValueSpan, objectRotationZSlider, objectRotationZValueSpan;
 let objectScaleSlider, objectScaleValueSpan;
 let modelColorHueSlider, modelColorHueValueSpan, objectBrightnessSlider, objectBrightnessValueSpan;
@@ -311,6 +320,21 @@ function getSelectedObject3D() {
     if (!selectedObjectUUID) return null; // No object selected
     const selectedData = sceneObjects.find(obj => obj.uuid === selectedObjectUUID);
     return selectedData ? selectedData.object3D : null;
+}
+
+// --- Helper to calculate base Y (position Y where bottom touches 0) ---
+function calculateObjectBaseY(object) {
+    if (!object) return 0;
+    object.updateMatrixWorld(true); // Ensure matrix is current
+    const boundingBox = new THREE.Box3().setFromObject(object, true); // Precise bounds
+    let base = 0;
+    if (!boundingBox.isEmpty() && !boundingBox.getSize(new THREE.Vector3()).equals(new THREE.Vector3(0,0,0))) {
+        base = -boundingBox.min.y; // Base is negative of the minimum y in world space
+    } else {
+        // Fallback: use current position y if bounds are invalid
+        base = object.position.y;
+    }
+    return base;
 }
 
 function isPoseableModel(modelPath) {
@@ -630,21 +654,62 @@ function resetObjectTransforms() {
     if (objectRotationYSlider) objectRotationYSlider.value = 0;
     if (objectRotationZSlider) objectRotationZSlider.value = 0;
     if (objectScaleSlider) objectScaleSlider.value = 1.0;
-    // Don't reset Y offset here, it's handled by onModelYOffsetChange using objectBaseY
-    logToPage("Object transform sliders reset to defaults (Rot 0, Scale 1).");
-    updateObjectRotationDisplay();
-    if (objectScaleValueSpan) objectScaleValueSpan.textContent = '1.00x';
+    if (modelYOffsetSlider) modelYOffsetSlider.value = 0; // Reset Y offset slider too
+    if (objectXPositionSlider) objectXPositionSlider.value = 0; // Reset X slider
+    if (objectZPositionSlider) objectZPositionSlider.value = 0; // Reset Z slider
 
-     // Also apply these resets to the selected object if one exists
+    logToPage("Object transform sliders reset to defaults (Pos 0, Rot 0, Scale 1).");
+
+     // Apply these resets to the selected object if one exists
      const selectedObj3D = getSelectedObject3D();
      if (selectedObj3D) {
+         // Calculate base Y first
+         const baseOffsetY = calculateObjectBaseY(selectedObj3D);
+
+         selectedObj3D.position.set(0, baseOffsetY, 0); // Reset position (X=0, Y=base, Z=0)
          selectedObj3D.rotation.set(0, 0, 0); // Reset rotation directly
          selectedObj3D.quaternion.setFromEuler(selectedObj3D.rotation); // Update quaternion
          selectedObj3D.scale.set(1, 1, 1);
-         // Re-apply Y offset after scale reset
-         onModelYOffsetChange(); // This calculates base Y and applies offset
+
+         // Update sliders to reflect the reset state of the object
+         updateSliderValuesFromObject(selectedObj3D);
          updateTargets();
      }
+}
+
+function resetObjectState() {
+    const selectedObject = getSelectedObject3D(); // Use helper
+    if (!selectedObject) {
+        logToPage("Reset Object State: No object selected.", "warn");
+        return;
+    }
+
+    try {
+        logToPage(`Attempting to reset state for object: ${selectedObject.name || selectedObjectUUID}`);
+
+        // Calculate base Y for reset position
+        const baseOffsetY = calculateObjectBaseY(selectedObject);
+
+        // Reset position (X=0, Y=base, Z=0)
+        selectedObject.position.set(0, baseOffsetY, 0);
+
+        // Reset rotation
+        selectedObject.rotation.set(0, 0, 0);
+        selectedObject.quaternion.setFromEuler(selectedObject.rotation); // Update quaternion
+
+        // Reset scale
+        selectedObject.scale.set(1, 1, 1);
+
+        // Update ALL sliders to reflect the reset state
+        updateSliderValuesFromObject(selectedObject);
+        // Update targets (light/camera)
+        updateTargets();
+
+        logToPage(`Reset state complete for object: ${selectedObject.name || selectedObjectUUID}`, "success");
+
+    } catch (e) {
+        logToPage(`Error during resetObjectState: ${e.message}`, 'error');
+    }
 }
 
 function updateTargets() {
@@ -703,132 +768,88 @@ function updateTargets() {
      // No immediate controls.update() needed here, handled by animation loop or specific actions.
 }
 
-function updateSliderValuesFromObject() {
-    // No Log here, gets called too often during gizmo drag
-
-    const selectedObj3D = getSelectedObject3D(); // Get selected object
-
-    // --- Update Material Sliders ---
-    if (modelColorHueSlider && objectBrightnessSlider && objectRoughnessSlider && objectMetalnessSlider) {
-        let representativeMaterial = null;
-        if (selectedObj3D) {
-             if (selectedObj3D.isMesh && selectedObj3D.material && selectedObj3D.material.isMeshStandardMaterial) {
-                  representativeMaterial = selectedObj3D.material;
-             } else if (selectedObj3D.isGroup) {
-                  selectedObj3D.traverse((child) => {
-                      // Find the *first* suitable material
-                      if (!representativeMaterial && child.isMesh && child.material && child.material.isMeshStandardMaterial) {
-                          representativeMaterial = child.material;
-                      }
-                  });
-             }
-        }
-        // Fallback to the shared base material if no object selected or no material found
-        if (!representativeMaterial) {
-             representativeMaterial = objectMaterial; // The global one used for new primitives
-        }
-
-        if (representativeMaterial && representativeMaterial.isMeshStandardMaterial) {
-            const currentHSL = { h: 0, s: 0, l: 0 };
-            // Use a default saturation if the color is grayscale (s=0)
-            representativeMaterial.color.getHSL(currentHSL);
-            const displayHue = currentHSL.s === 0 ? parseFloat(modelColorHueSlider.value) : currentHSL.h; // Use slider value if grayscale
-
-            // Check if the material has a texture map - disable Hue/Brightness if so?
-            const hasTextureMap = representativeMaterial.map !== null;
-            modelColorHueSlider.disabled = hasTextureMap;
-            objectBrightnessSlider.disabled = hasTextureMap;
-            if (hasTextureMap) {
-                // Optionally gray out or visually indicate disabled state
-                modelColorHueSlider.style.opacity = 0.5;
-                objectBrightnessSlider.style.opacity = 0.5;
-                modelColorHueValueSpan.textContent = 'N/A';
-                objectBrightnessValueSpan.textContent = 'N/A';
-            } else {
-                 modelColorHueSlider.style.opacity = 1;
-                 objectBrightnessSlider.style.opacity = 1;
-                 modelColorHueSlider.value = displayHue;
-                 objectBrightnessSlider.value = currentHSL.l;
-                 modelColorHueValueSpan.textContent = `${Math.round(displayHue * 360)}°`;
-                 objectBrightnessValueSpan.textContent = currentHSL.l.toFixed(2);
-            }
-
-
-            objectRoughnessSlider.value = representativeMaterial.roughness;
-            objectMetalnessSlider.value = representativeMaterial.metalness;
-
-            // Update spans regardless of dragging (simpler logic)
-            objectRoughnessValueSpan.textContent = representativeMaterial.roughness.toFixed(2);
-            objectMetalnessValueSpan.textContent = representativeMaterial.metalness.toFixed(2);
-
-            if(!modelColorHueSlider.disabled) modelColorHueSlider.dispatchEvent(new Event('input'));
-            if(!objectBrightnessSlider.disabled) objectBrightnessSlider.dispatchEvent(new Event('input'));
-            objectRoughnessSlider.dispatchEvent(new Event('input'));
-            objectMetalnessSlider.dispatchEvent(new Event('input'));
-        }
+function updateSliderValuesFromObject(object) {
+    // If no object, reset sliders to default visual state (optional, can be jarring)
+    if (!object) {
+        // Example: Reset position sliders to 0 visually
+        if (modelYOffsetSlider) modelYOffsetSlider.value = 0;
+        if (modelYOffsetValueSpan) modelYOffsetValueSpan.textContent = '0.0';
+        if (objectXPositionSlider) objectXPositionSlider.value = 0;
+        if (objectXPositionValueSpan) objectXPositionValueSpan.textContent = '0.0';
+        if (objectZPositionSlider) objectZPositionSlider.value = 0;
+        if (objectZPositionValueSpan) objectZPositionValueSpan.textContent = '0.0';
+        // Reset others if needed... (Rotation, Scale, Material...)
+        // This function primarily syncs sliders TO the object, so resetting might be less useful here.
+        return;
     }
 
-    // --- Update Transform Sliders ---
-    if (selectedObj3D) {
-        // Position / Y Offset
-         if (modelYOffsetSlider) {
-             // Calculate offset relative to the object's *own* base Y
-            const bounds = new THREE.Box3().setFromObject(selectedObj3D, true); // Precise bounds
-            let selectedBaseY = 0;
-            // Use origin Y if bounds are bad
-            if (!bounds.isEmpty() && !bounds.getSize(new THREE.Vector3()).equals(new THREE.Vector3(0,0,0))) {
-                 selectedBaseY = -bounds.min.y;
-            } else {
-                 selectedBaseY = selectedObj3D.position.y - parseFloat(modelYOffsetSlider.value); // Estimate base Y from current pos and slider
-                 // logToPage("Using estimated base Y for Y-offset calc due to bad bounds", "warn"); // Too noisy
-            }
+    // --- Position ---
+    const currentBaseY = calculateObjectBaseY(object);
+    const currentYOffset = object.position.y - currentBaseY;
 
-            // Calculate offset based on current position and calculated base
-            const currentOffset = selectedObj3D.position.y - selectedBaseY;
-            modelYOffsetSlider.value = currentOffset; // Update slider value
-            // Update span directly
-             if(modelYOffsetValueSpan) modelYOffsetValueSpan.textContent = currentOffset.toFixed(1);
+    if (modelYOffsetSlider) {
+        modelYOffsetSlider.value = currentYOffset;
+        if (modelYOffsetValueSpan) modelYOffsetValueSpan.textContent = currentYOffset.toFixed(1);
+    }
+    if (objectXPositionSlider) {
+        objectXPositionSlider.value = object.position.x;
+        if (objectXPositionValueSpan) objectXPositionValueSpan.textContent = object.position.x.toFixed(1);
+    }
+    if (objectZPositionSlider) {
+        objectZPositionSlider.value = object.position.z;
+        if (objectZPositionValueSpan) objectZPositionValueSpan.textContent = object.position.z.toFixed(1);
+    }
+
+    // --- Rotation (Update sliders from object's Euler angles) ---
+    const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'YXZ'); // Use a common order
+    if (objectRotationXSlider) objectRotationXSlider.value = THREE.MathUtils.radToDeg(euler.x);
+    if (objectRotationYSlider) objectRotationYSlider.value = THREE.MathUtils.radToDeg(euler.y);
+    if (objectRotationZSlider) objectRotationZSlider.value = THREE.MathUtils.radToDeg(euler.z);
+    updateObjectRotationDisplay(); // Update text spans for rotation
+
+    // --- Scale (Assuming uniform scaling) ---
+    if (objectScaleSlider) {
+        objectScaleSlider.value = object.scale.x; // Assume uniform
+        if (objectScaleValueSpan) objectScaleValueSpan.textContent = object.scale.x.toFixed(2) + 'x';
+    }
+
+    // --- Material (Get from representative material) ---
+    let representativeMaterial = null;
+    if (object.isMesh && object.material && object.material.isMeshStandardMaterial) {
+        representativeMaterial = object.material;
+    } else if (object.isGroup) {
+        object.traverse((child) => {
+            if (!representativeMaterial && child.isMesh && child.material && child.material.isMeshStandardMaterial) {
+                representativeMaterial = child.material;
+            }
+        });
+    }
+
+    if (representativeMaterial) {
+        // Only update Hue/Brightness sliders if material has no texture map
+        if (!representativeMaterial.map) {
+            const hsl = { h: 0, s: 0, l: 0 };
+            representativeMaterial.color.getHSL(hsl);
+            if (modelColorHueSlider) modelColorHueSlider.value = hsl.h;
+            if (objectBrightnessSlider) objectBrightnessSlider.value = hsl.l;
+            if (modelColorHueValueSpan) modelColorHueValueSpan.textContent = `${Math.round(hsl.h * 360)}°`;
+            if (objectBrightnessValueSpan) objectBrightnessValueSpan.textContent = hsl.l.toFixed(2);
+        } else {
+             // If map exists, maybe disable or indicate sliders aren't applicable?
+             // For now, just don't update them from the object.
         }
-        // Rotation
-        if (objectRotationXSlider) {
-            const euler = new THREE.Euler().setFromQuaternion(selectedObj3D.quaternion, 'XYZ'); // Read from Quaternion
-            objectRotationXSlider.value = THREE.MathUtils.radToDeg(euler.x);
-            objectRotationYSlider.value = THREE.MathUtils.radToDeg(euler.y);
-            objectRotationZSlider.value = THREE.MathUtils.radToDeg(euler.z);
-            // Update spans directly
-            updateObjectRotationDisplay();
-        }
-        // Scale
-        if (objectScaleSlider) {
-            // Assume uniform scaling for the slider control
-            const scaleValue = selectedObj3D.scale.x; // Read X scale
-            objectScaleSlider.value = scaleValue;
-            // Update span directly
-            if(objectScaleValueSpan) objectScaleValueSpan.textContent = scaleValue.toFixed(2) + 'x';
-        }
+
+        // Update Roughness/Metalness sliders
+        if (objectRoughnessSlider) objectRoughnessSlider.value = representativeMaterial.roughness;
+        if (objectMetalnessSlider) objectMetalnessSlider.value = representativeMaterial.metalness;
+        if (objectRoughnessValueSpan) objectRoughnessValueSpan.textContent = representativeMaterial.roughness.toFixed(2);
+        if (objectMetalnessValueSpan) objectMetalnessValueSpan.textContent = representativeMaterial.metalness.toFixed(2);
     } else {
-        // No object selected - Reset sliders to default visual state?
-        // Resetting values might be confusing, just ensure they reflect the base material
-        if (objectMaterial) { // Only if not dragging
-             const hsl = {h:0, s:0, l:0};
-             objectMaterial.color.getHSL(hsl);
-             if (modelColorHueSlider) modelColorHueSlider.value = hsl.h;
-             if (objectBrightnessSlider) objectBrightnessSlider.value = hsl.l;
-             if (objectRoughnessSlider) objectRoughnessSlider.value = objectMaterial.roughness;
-             if (objectMetalnessSlider) objectMetalnessSlider.value = objectMaterial.metalness;
-             if (modelColorHueSlider) modelColorHueSlider.dispatchEvent(new Event('input'));
-             if (objectBrightnessSlider) objectBrightnessSlider.dispatchEvent(new Event('input'));
-             if (objectRoughnessSlider) objectRoughnessSlider.dispatchEvent(new Event('input'));
-             if (objectMetalnessSlider) objectMetalnessSlider.dispatchEvent(new Event('input'));
-        }
-        // Reset transform sliders visuals
-        if (modelYOffsetSlider) { modelYOffsetSlider.value = 0; modelYOffsetSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationXSlider) { objectRotationXSlider.value = 0; objectRotationXSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationYSlider) { objectRotationYSlider.value = 0; objectRotationYSlider.dispatchEvent(new Event('input'));}
-        if (objectRotationZSlider) { objectRotationZSlider.value = 0; objectRotationZSlider.dispatchEvent(new Event('input'));}
-        if (objectScaleSlider) { objectScaleSlider.value = 1; objectScaleSlider.dispatchEvent(new Event('input'));}
+        // No suitable material found, perhaps reset material sliders?
+        // logToPage("Could not find representative material to update sliders.", "warn"); // Optional warning
     }
 }
+
 
 async function updateObject(requestedShapeType) { // Make async
     logToPage(`Creating/Loading object definition for: ${requestedShapeType}`);
@@ -978,6 +999,10 @@ function getDOMElements() {
     floorBrightnessSlider = document.getElementById('floorBrightness'); floorBrightnessValueSpan = document.getElementById('floorBrightnessValue');
     // Object
     modelYOffsetSlider = document.getElementById('modelYOffset'); modelYOffsetValueSpan = document.getElementById('modelYOffsetValue');
+    objectXPositionSlider = document.getElementById('objectXPosition'); // ADDED
+    objectXPositionValueSpan = document.getElementById('objectXPositionValue'); // ADDED
+    objectZPositionSlider = document.getElementById('objectZPosition'); // ADDED
+    objectZPositionValueSpan = document.getElementById('objectZPositionValue'); // ADDED
     objectRotationXSlider = document.getElementById('objectRotationX'); objectRotationXValueSpan = document.getElementById('objectRotationXValue');
     objectRotationYSlider = document.getElementById('objectRotationY'); objectRotationYValueSpan = document.getElementById('objectRotationYValue');
     objectRotationZSlider = document.getElementById('objectRotationZ'); objectRotationZValueSpan = document.getElementById('objectRotationZValue');
@@ -1008,7 +1033,7 @@ function getDOMElements() {
      const requiredElements = [
         sceneContainer, controlsContainer, toggleControlsBtn, shapeSelect, shapeSearchInput, refreshShapeListBtn, copyLogBtn, cameraLockBtn, gridHelperToggle, /*axesHelperToggle REMOVED*/, resetObjectBtn, saveStateBtn, loadStateBtn, resetSceneBtn,
         wallHueSlider, wallHueValueSpan, wallSaturationSlider, wallSaturationValueSpan, wallBrightnessSlider, wallBrightnessValueSpan, floorHueSlider, floorHueValueSpan, floorSaturationSlider, floorSaturationValueSpan, floorBrightnessSlider, floorBrightnessValueSpan,
-        modelYOffsetSlider, modelYOffsetValueSpan, objectRotationXSlider, objectRotationXValueSpan, objectRotationYSlider, objectRotationYValueSpan, objectRotationZSlider, objectRotationZValueSpan, objectScaleSlider, objectScaleValueSpan,
+        modelYOffsetSlider, modelYOffsetValueSpan, objectXPositionSlider, objectXPositionValueSpan, objectZPositionSlider, objectZPositionValueSpan, objectRotationXSlider, objectRotationXValueSpan, objectRotationYSlider, objectRotationYValueSpan, objectRotationZSlider, objectRotationZValueSpan, objectScaleSlider, objectScaleValueSpan,
         modelColorHueSlider, modelColorHueValueSpan, objectBrightnessSlider, objectBrightnessValueSpan, objectRoughnessSlider, objectRoughnessValueSpan, objectMetalnessSlider, objectMetalnessValueSpan,
         lightIntensitySlider, lightIntensityValueSpan, lightAngleSlider, lightAngleValueSpan, lightPenumbraSlider, lightPenumbraValueSpan, lightXSlider, lightYSlider, lightZSlider, lightXValueSpan, lightYValueSpan, lightZValueSpan,
         openPoserBtn, poseSelect, refreshPosesBtn, objectListElement, focusCameraBtn, decoupleCameraBtn
@@ -1017,7 +1042,7 @@ function getDOMElements() {
         const elementNames = [
             "sceneContainer", "controlsContainer", "toggleControlsBtn", "shapeSelect", "shapeSearchInput", "refreshShapeListBtn", "copyLogBtn", "cameraLockBtn", "gridHelperToggle", /*axesHelperToggle REMOVED*/, "resetObjectBtn", "saveStateBtn", "loadStateBtn", "resetSceneBtn",
             "wallHueSlider", "wallHueValueSpan", "wallSaturationSlider", "wallSaturationValueSpan", "wallBrightnessSlider", "wallBrightnessValueSpan", "floorHueSlider", "floorHueValueSpan", "floorSaturationSlider", "floorSaturationValueSpan", "floorBrightnessSlider", "floorBrightnessValueSpan",
-            "modelYOffsetSlider", "modelYOffsetValueSpan", "objectRotationXSlider", "objectRotationXValueSpan", "objectRotationYSlider", "objectRotationYValueSpan", "objectRotationZSlider", "objectRotationZValueSpan", "objectScaleSlider", "objectScaleValueSpan",
+            "modelYOffsetSlider", "modelYOffsetValueSpan", "objectXPositionSlider", "objectXPositionValueSpan", "objectZPositionSlider", "objectZPositionValueSpan", "objectRotationXSlider", "objectRotationXValueSpan", "objectRotationYSlider", "objectRotationYValueSpan", "objectRotationZSlider", "objectRotationZValueSpan", "objectScaleSlider", "objectScaleValueSpan",
             "modelColorHueSlider", "modelColorHueValueSpan", "objectBrightnessSlider", "objectBrightnessValueSpan", "objectRoughnessSlider", "objectRoughnessValueSpan", "objectMetalnessSlider", "objectMetalnessValueSpan",
             "lightIntensitySlider", "lightIntensityValueSpan", "lightAngleSlider", "lightAngleValueSpan", "lightPenumbraSlider", "lightPenumbraValueSpan", "lightXSlider", "lightYSlider", "lightZSlider", "lightXValueSpan", "lightYValueSpan", "lightZValueSpan",
             "openPoserBtn", "poseSelect", "refreshPosesBtn", "objectListElement", "focusCameraBtn", "decoupleCameraBtn"
@@ -1177,60 +1202,111 @@ function populateObjectList() {
 }
 
 function selectObject(uuidToSelect) {
-    if (selectedObjectUUID === uuidToSelect) return;
-    selectedObjectUUID = uuidToSelect;
-    populateObjectList();
+    if (selectedObjectUUID === uuidToSelect) return; // No change if clicking the same object
+    selectedObjectUUID = uuidToSelect; // Update the global selection tracker
+
+    populateObjectList(); // Update the list UI to reflect the new selection
+
     const selectedObjData = sceneObjects.find(obj => obj.uuid === selectedObjectUUID);
 
     if (selectedObjData?.object3D) {
-        updateTargets();
+        logToPage(`Selected object: ${selectedObjectUUID}`);
+        updateTargets(); // Update light/camera targets
+
+        // Update pose controls based on selection
         const isPoseable = selectedObjData.isPoseable;
         if(openPoserBtn) openPoserBtn.disabled = !isPoseable;
         if(poseSelect) poseSelect.disabled = !isPoseable;
         if(refreshPosesBtn) refreshPosesBtn.disabled = !isPoseable;
-        if(poseSelect) poseSelect.innerHTML = '<option value="">Default Pose</option>';
+        if(poseSelect) poseSelect.innerHTML = '<option value="">Default Pose</option>'; // Clear old poses
         if (isPoseable) {
-             currentModelPath = selectedObjData.originalType;
-             loadPosesForModel(selectedObjData.originalType);
+             currentModelPath = selectedObjData.originalType; // Store path for poser
+             loadPosesForModel(selectedObjData.originalType); // Load poses for this model
         } else {
-              currentModelPath = null;
+              currentModelPath = null; // Clear path if not poseable
         }
-        updateSliderValuesFromObject();
+
+        // Update sliders to match the selected object's current state
+        updateSliderValuesFromObject(selectedObjData.object3D);
 
     } else {
-        // Deselection logic
+        // Deselection or object not found
         if(uuidToSelect) {
             logToPage(`Selected object data or 3D object not found for UUID: ${uuidToSelect}`, 'error');
+        } else {
+            logToPage("Object deselected.");
         }
-        selectedObjectUUID = null;
+        selectedObjectUUID = null; // Ensure UUID is null if deselected/invalid
+
+        // Disable pose controls
         if(openPoserBtn) openPoserBtn.disabled = true;
         if(poseSelect) poseSelect.disabled = true;
         if(refreshPosesBtn) refreshPosesBtn.disabled = true;
         if(poseSelect) poseSelect.innerHTML = '<option value="">Default Pose</option>';
         currentModelPath = null;
-        updateSliderValuesFromObject();
+
+        // Update sliders (e.g., reset them or show defaults)
+        updateSliderValuesFromObject(null); // Pass null to indicate deselection
+
+        // Update targets (will now target origin)
         updateTargets();
     }
 }
 
+
 function deleteObject(uuid) {
-    // Remove from sceneObjects
+    // Find the object in our management array
     const idx = sceneObjects.findIndex(obj => obj.uuid === uuid);
-    if (idx === -1) return;
+    if (idx === -1) {
+        logToPage(`Delete Object: UUID ${uuid} not found in sceneObjects.`, 'warn');
+        return;
+    }
+
     const objData = sceneObjects[idx];
-    // Remove from scene
+    logToPage(`Deleting object: ${uuid} (${objData.originalType})`);
+
+    // Remove from Three.js scene
     if (objData.object3D && objData.object3D.parent) {
         objData.object3D.parent.remove(objData.object3D);
+        logToPage(`Removed object from Three.js scene graph.`);
+    } else {
+        logToPage(`Could not remove object from scene graph (no parent?).`, 'warn');
     }
-    // Remove from array
+
+    // Dispose of geometries and materials to free memory (important!)
+    if (objData.object3D) {
+        objData.object3D.traverse(child => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+        logToPage(`Disposed geometries/materials for ${uuid}.`);
+    }
+
+
+    // Remove from our management array
     sceneObjects.splice(idx, 1);
+    logToPage(`Removed object data from sceneObjects array.`);
+
     // Deselect if it was selected
     if (selectedObjectUUID === uuid) {
-        selectedObjectUUID = null;
+        logToPage(`Object ${uuid} was selected, deselecting now.`);
+        selectObject(null); // Use the select function with null to handle deselection logic
+    } else {
+         // If it wasn't selected, just refresh the list UI
+         populateObjectList();
+         // Target might need updating if the deleted object was the only one
+         if (sceneObjects.length === 0) updateTargets();
     }
-    populateObjectList();
-    updateSliderValuesFromObject();
-    updateTargets();
+
+    logToPage(`Deletion process complete for ${uuid}.`, "success");
 }
 
 // --- END OBJECT MANAGEMENT FUNCTIONS ---
@@ -1323,6 +1399,7 @@ async function init() { // Make init async
         controls.enableDamping = true; controls.dampingFactor = 0.05; controls.screenSpacePanning = false;
         controls.maxPolarAngle = Math.PI / 2 - 0.01;
         controls.minDistance = 2; controls.maxDistance = 50;
+        controls.enableRotate = true; // Ensure rotation is enabled initially
         controls.update();
         /*
             Mobile/Touch support:
@@ -1349,14 +1426,20 @@ async function init() { // Make init async
         refreshShapeListBtn.addEventListener('click', resetShapeDropdown);
         cameraLockBtn.addEventListener('click', toggleCameraLock);
         gridHelperToggle.addEventListener('change', () => { gridHelper.visible = gridHelperToggle.checked; });
-        resetObjectBtn.addEventListener('click', resetObjectState);
+        resetObjectBtn.addEventListener('click', resetObjectState); // Re-linked resetObjectState
         wallHueSlider.addEventListener('input', onWallColorChange);
         wallSaturationSlider.addEventListener('input', onWallColorChange);
         wallBrightnessSlider.addEventListener('input', onWallColorChange);
         floorHueSlider.addEventListener('input', onFloorColorChange);
         floorSaturationSlider.addEventListener('input', onFloorColorChange);
         floorBrightnessSlider.addEventListener('input', onFloorColorChange);
-        modelYOffsetSlider.addEventListener('input', onModelYOffsetChange);
+
+        // *** UPDATED Position Slider Listeners ***
+        modelYOffsetSlider.addEventListener('input', onModelYOffsetChange); // Reverted to original handler
+        objectXPositionSlider.addEventListener('input', onObjectXPositionChange); // Linked to new X handler
+        objectZPositionSlider.addEventListener('input', onObjectZPositionChange); // Linked to new Z handler
+        // *** END UPDATED Listeners ***
+
         objectRotationXSlider.addEventListener('input', onObjectRotationChange);
         objectRotationYSlider.addEventListener('input', onObjectRotationChange);
         objectRotationZSlider.addEventListener('input', onObjectRotationChange);
@@ -1399,6 +1482,7 @@ async function init() { // Make init async
         renderer.domElement.addEventListener('click', onSceneClick, false);
         focusCameraBtn?.addEventListener('click', () => focusCameraOnSelection(false));
         decoupleCameraBtn?.addEventListener('click', toggleCameraDecoupling);
+        // --- REMOVED Free look listeners here - they are added/removed dynamically ---
         logToPage("Event listeners added.");
 
         // --- Apply Initial State ---
@@ -1441,6 +1525,9 @@ function onWindowResize() {
 }
 
 function onSceneClick(event) {
+    // Prevent raycasting/selection if we are in free look drag mode
+    if (isDraggingFreeLook || isCameraDecoupled) return;
+
     if (!raycaster || !camera || !sceneObjects || sceneObjects.length === 0) return;
 
     const mouse = new THREE.Vector2();
@@ -1537,60 +1624,31 @@ function toggleCameraLock() {
      try {
          if (!controls || !cameraLockBtn) return;
          controls.enabled = !controls.enabled;
+         // If locking camera, also ensure free look dragging stops if active
+         if (!controls.enabled && isDraggingFreeLook) {
+            isDraggingFreeLook = false;
+         }
          cameraLockBtn.textContent = controls.enabled ? 'Lock Camera' : 'Unlock Camera';
-         logToPage(`Camera controls ${controls.enabled ? 'enabled' : 'disabled'}.`);
+         logToPage(`Camera controls ${controls.enabled ? 'enabled (Orbit/Pan/Zoom)' : 'disabled'}.`);
      } catch (e) { logToPage(`Camera lock toggle error: ${e.message}`, 'error'); }
  }
-
-function resetObjectState() {
-     logToPage("Resetting selected object state (if any)...");
-     const selectedObj3D = getSelectedObject3D();
-     if (!selectedObj3D) {
-         logToPage("No object selected to reset.", "info");
-         return;
-     }
-     logToPage(`Resetting state for object: ${selectedObjectUUID}`);
-     try {
-         // Reset sliders controlling the selected object
-         const objectControlSliderIds = [
-             'modelYOffset', 'objectRotationX', 'objectRotationY', 'objectRotationZ',
-             'objectScale', 'modelColorHue', 'objectBrightness', 'objectRoughness', 'objectMetalness'
-         ];
-         objectControlSliderIds.forEach(id => {
-             const resetButton = document.querySelector(`.reset-slider-btn[data-target-slider="${id}"]`);
-             if (resetButton?.click) {
-                 resetButton.click(); // Simulate clicking the reset button for that specific slider
-             } else {
-                 logToPage(`Could not find or click reset button for slider ${id}`, 'warn');
-             }
-         });
-
-         // Also reset pose if it's a poseable model
-         const selectedObjData = sceneObjects.find(obj => obj.uuid === selectedObjectUUID);
-          if (selectedObjData?.isPoseable && poseSelect) {
-              poseSelect.value = ''; // Select "Default Pose"
-              applyPose(''); // Apply the default pose logic
-              logToPage("Reset applied default pose to selected object.");
-          }
-
-         logToPage("Selected object state reset triggered via sliders/pose.");
-     } catch (e) {
-          logToPage(`Error during object reset: ${e.message}`, 'error');
-     }
-  }
 
 async function resetSceneToDefaults() {
     logToPage("Resetting scene to defaults...");
     try {
         // --- 1. Reset UI Toggles ---
         gridHelperToggle.checked = true;
-        // axesHelperToggle.checked = false; // <-- REMOVED
         document.body.classList.remove('controls-collapsed');
         toggleControls(); toggleControls(); // Ensure correct button text
 
         logToPage("UI panel set to open.");
-        controls.enabled = true;
+        controls.enabled = true; // Ensure OrbitControls main enabled state is true
         cameraLockBtn.textContent = 'Lock Camera';
+
+        // --- Ensure camera is NOT decoupled ---
+        if (isCameraDecoupled) {
+            toggleCameraDecoupling(); // Switch back to Orbit mode
+        }
         logToPage("UI toggles reset.");
         // --- End Reset UI Toggles ---
 
@@ -1641,16 +1699,15 @@ async function resetSceneToDefaults() {
             logToPage("No primitive options found, defaulting to sphere.", 'warn');
         }
         shapeSelect.value = selectedPrimitiveValue;
-        await handleShapeSelectionChange();
+        await handleShapeSelectionChange(); // This will select the new object
 
         // --- 5. Reset Camera and Helpers ---
         logToPage("Resetting camera and helpers...");
         gridHelper.visible = gridHelperToggle.checked;
         axesHelper.visible = false; // <-- Directly set visibility to false
         camera.position.set(0, 6, 14);
-        if (isCameraDecoupled) {
-             toggleCameraDecoupling();
-        }
+        // updateTargets() will be called by selectObject within handleShapeSelectionChange
+        // But call controls.update() to finalize camera position/target visually
         controls.update();
 
         // --- 6. Final UI State ---
@@ -1696,30 +1753,51 @@ function onWallColorChange() {
 
 // --- Object Control Handlers ---
 
+// --- RESTORED Original Y Offset Handler ---
 function onModelYOffsetChange() {
     const selectedObj3D = getSelectedObject3D();
-    if (!selectedObj3D || !modelYOffsetSlider || !modelYOffsetValueSpan) return; // Exit if no object selected or sliders missing
+    if (!selectedObj3D || !modelYOffsetSlider || !modelYOffsetValueSpan) return;
 
     try {
         const offset = parseFloat(modelYOffsetSlider.value);
         modelYOffsetValueSpan.textContent = offset.toFixed(1);
 
-        // Calculate base Y specifically for the selected object
-        const bounds = new THREE.Box3().setFromObject(selectedObj3D, true); // Precise bounds
-        let selectedBaseY = 0;
-        // Use object's current Y if bounds are bad
-        if (!bounds.isEmpty() && !bounds.getSize(new THREE.Vector3()).equals(new THREE.Vector3(0,0,0))) {
-             selectedBaseY = -bounds.min.y;
-        } else {
-             selectedBaseY = selectedObj3D.position.y - offset; // Estimate base Y from current pos and slider
-        }
+        // Calculate base Y specifically for the selected object dynamically
+        const selectedBaseY = calculateObjectBaseY(selectedObj3D);
 
         selectedObj3D.position.y = selectedBaseY + offset;
 
-        updateTargets();
+        updateTargets(); // Crucial: Update light/camera target after position change
 
     } catch(e){ logToPage(`Y Offset change error: ${e.message}`,'error')}
 }
+
+// --- NEW Dedicated X Position Handler ---
+function onObjectXPositionChange() {
+    const selectedObj3D = getSelectedObject3D();
+    if (!selectedObj3D || !objectXPositionSlider || !objectXPositionValueSpan) return;
+    try {
+        const value = parseFloat(objectXPositionSlider.value);
+        selectedObj3D.position.x = value;
+        objectXPositionValueSpan.textContent = value.toFixed(1);
+        updateTargets(); // Crucial: Update light/camera target after position change
+    } catch(e){ logToPage(`X Position change error: ${e.message}`,'error')}
+}
+
+// --- NEW Dedicated Z Position Handler ---
+function onObjectZPositionChange() {
+    const selectedObj3D = getSelectedObject3D();
+    if (!selectedObj3D || !objectZPositionSlider || !objectZPositionValueSpan) return;
+    try {
+        const value = parseFloat(objectZPositionSlider.value);
+        selectedObj3D.position.z = value;
+        objectZPositionValueSpan.textContent = value.toFixed(1);
+        updateTargets(); // Crucial: Update light/camera target after position change
+    } catch(e){ logToPage(`Z Position change error: ${e.message}`,'error')}
+}
+
+// --- REMOVED combined onObjectPositionChange function ---
+
 
 function onObjectRotationChange() {
     const selectedObj3D = getSelectedObject3D();
@@ -1755,7 +1833,14 @@ function onObjectScaleChange() {
 
         // Recalculate center and update targets after scaling
         // Also re-apply Y offset as base Y changes with scale
-        onModelYOffsetChange(); // Call this to recalculate base Y and apply offset correctly
+        // --- Update Y slider visual based on new base Y ---
+        const currentBaseY = calculateObjectBaseY(selectedObj3D);
+        const currentYOffset = selectedObj3D.position.y - currentBaseY;
+        if (modelYOffsetSlider) modelYOffsetSlider.value = currentYOffset;
+        if (modelYOffsetValueSpan) modelYOffsetValueSpan.textContent = currentYOffset.toFixed(1);
+        // --- End Y slider visual update ---
+
+        updateTargets(); // Update light/camera target
 
     } catch(e) {
         logToPage(`Scale change error: ${e.message}`, 'error');
@@ -1954,7 +2039,7 @@ async function handleShapeSelectionChange() { // Make async
         // --- Add to Scene and State Array ---
         logToPage(`Adding new object ${newId} (${result.originalType}) to scene...`);
         // 1. Set initial position/rotation/scale (usually origin/zero/one)
-        newObject.position.set(0, 0, 0);
+        newObject.position.set(0, 0, 0); // Set initial Y to 0, will adjust below
         newObject.rotation.set(0, 0, 0);
         newObject.quaternion.setFromEuler(newObject.rotation); // Init quaternion
         newObject.scale.set(1, 1, 1);
@@ -1971,18 +2056,11 @@ async function handleShapeSelectionChange() { // Make async
         };
         sceneObjects.push(sceneObjectData);
 
-        // --- Position based on bounds (AFTER adding to scene) ---
-        newObject.updateMatrixWorld(true); // Ensure matrix is current
-        const boundingBox = new THREE.Box3().setFromObject(newObject, true); // Precise bounds
-        let newObjectBaseY = 0;
-        if (!boundingBox.isEmpty() && !boundingBox.getSize(new THREE.Vector3()).equals(new THREE.Vector3(0,0,0))) {
-            newObjectBaseY = -boundingBox.min.y;
-        } else {
-            logToPage(`Warning: BBox empty/zero for base Y calc on ${newId}. Using origin Y.`, 'warn');
-            newObjectBaseY = newObject.position.y; // Use current Y (likely 0)
-        }
-        newObject.position.y = newObjectBaseY; // Set initial Y based on its bounds
-        newObject.updateMatrixWorld(true);
+        // --- Position based on bounds (AFTER adding to scene and array) ---
+        // Calculate base Y and set the object's initial Y position
+        const newObjectBaseY = calculateObjectBaseY(newObject);
+        newObject.position.y = newObjectBaseY;
+        newObject.updateMatrixWorld(true); // Update matrix again after position set
         logToPage(`Positioned new object ${newId} at Y: ${newObjectBaseY.toFixed(3)}`);
 
         // --- Apply Pose (if requested during creation) ---
@@ -2034,6 +2112,7 @@ async function handleShapeSelectionChange() { // Make async
      event.stopPropagation();
      try {
          const button = event.target;
+         // *** USE data-target-slider consistently ***
          const sliderId = button.dataset.targetSlider;
          const resetValue = button.dataset.resetValue;
          const sliderElement = document.getElementById(sliderId);
@@ -2129,25 +2208,105 @@ function focusCameraOnSelection(smooth = false) { // Defaulting smooth to false 
      }
 }
 
+// --- NEW: Free Look Event Handlers ---
+function onFreeLookMouseDown(event) {
+    if (event.button !== 0) return; // Only respond to left mouse button
+    isDraggingFreeLook = true;
+    previousMousePosition.x = event.clientX;
+    previousMousePosition.y = event.clientY;
+    // Change cursor to indicate looking around
+    renderer.domElement.style.cursor = 'grabbing';
+}
+
+function onFreeLookMouseMove(event) {
+    if (!isDraggingFreeLook || !isCameraDecoupled) return;
+
+    const deltaX = event.clientX - previousMousePosition.x;
+    const deltaY = event.clientY - previousMousePosition.y;
+
+    // --- Calculate Rotation Quaternions ---
+    // Horizontal rotation (around world Y axis)
+    const rotY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -deltaX * freeLookSensitivity);
+
+    // Vertical rotation (around camera's local X axis)
+    // Get camera's local X axis
+    const cameraRight = new THREE.Vector3();
+    camera.getWorldDirection(cameraRight); // Get direction
+    cameraRight.cross(camera.up); // Get right vector
+    const rotX = new THREE.Quaternion().setFromAxisAngle(cameraRight, -deltaY * freeLookSensitivity);
+
+
+    // --- Apply Rotations ---
+    // Apply horizontal rotation first (relative to world)
+    camera.quaternion.premultiply(rotY);
+    // Apply vertical rotation second (relative to current camera orientation)
+    camera.quaternion.multiply(rotX);
+
+    // Optional: Clamp vertical rotation (prevent looking straight up/down)
+    // This requires converting quaternion to Euler, clamping, and converting back, which can be complex.
+    // Skipping for simplicity for now.
+
+    // Update previous mouse position
+    previousMousePosition.x = event.clientX;
+    previousMousePosition.y = event.clientY;
+}
+
+function onFreeLookMouseUp(event) {
+    if (event.button !== 0) return; // Only respond to left mouse button
+    isDraggingFreeLook = false;
+    // Restore default cursor
+    renderer.domElement.style.cursor = 'grab';
+}
+// --- END: Free Look Event Handlers ---
+
 function toggleCameraDecoupling() {
     isCameraDecoupled = !isCameraDecoupled;
-    logToPage(`Camera decoupling ${isCameraDecoupled ? 'ENABLED' : 'DISABLED'}.`);
+
     if (isCameraDecoupled) {
+        logToPage("Switching to Free Look camera mode.");
         decoupleCameraBtn.textContent = 'Free';
         decoupleCameraBtn.classList.add('decoupled');
-        // When decoupling, save the current target so we can potentially return
-        // Or just let the user pan freely. For now, just stop target updates.
-        controls.enablePan = true; // Ensure panning is enabled in free mode
-        logToPage("OrbitControls target updates disabled.");
+
+        // Disable OrbitControls rotation, keep panning enabled
+        controls.enableRotate = false;
+        controls.enablePan = true; // Panning usually uses right/middle mouse or shift+drag
+
+        // Add manual listeners for free look rotation (left drag)
+        renderer.domElement.addEventListener('mousedown', onFreeLookMouseDown, false);
+        // Add listeners to window to catch mouse move/up even if cursor leaves canvas
+        window.addEventListener('mousemove', onFreeLookMouseMove, false);
+        window.addEventListener('mouseup', onFreeLookMouseUp, false);
+
+        // Update cursor style
+        renderer.domElement.style.cursor = 'grab';
+
+        logToPage("OrbitControls rotation disabled. Free Look enabled on Left Drag. Panning enabled.");
 
     } else {
+        logToPage("Switching back to Orbit camera mode.");
         decoupleCameraBtn.textContent = 'Orbit';
         decoupleCameraBtn.classList.remove('decoupled');
-        controls.enablePan = true; // Keep panning enabled (standard orbit behavior)
+
+        // Stop any ongoing free look drag
+        isDraggingFreeLook = false;
+
+        // Remove manual listeners
+        renderer.domElement.removeEventListener('mousedown', onFreeLookMouseDown, false);
+        window.removeEventListener('mousemove', onFreeLookMouseMove, false);
+        window.removeEventListener('mouseup', onFreeLookMouseUp, false);
+
+        // Re-enable OrbitControls rotation
+        controls.enableRotate = true;
+        controls.enablePan = true; // Ensure panning is still enabled
+
+        // Restore default cursor (OrbitControls usually handles this)
+        renderer.domElement.style.cursor = 'grab'; // Reset to default grab
+
         // Re-target to selection immediately when re-coupling
         updateTargets(); // This will now set the target again
-        logToPage("OrbitControls target updates enabled.");
-        controls.update();
+        controls.update(); // Update controls state
+
+        logToPage("OrbitControls rotation enabled. Free Look disabled.");
     }
 }
 
@@ -2186,7 +2345,7 @@ function toggleCameraDecoupling() {
                       }
                   } else {
                        materialData = {
-                         hue: null, brightness: null,
+                         hue: null, brightness: null, // Indicate texture map prevents HSL save
                          roughness: representativeMaterial.roughness, metalness: representativeMaterial.metalness
                        }
                   }
@@ -2215,8 +2374,13 @@ function toggleCameraDecoupling() {
 
          // --- Create Full State Object ---
          const state = {
-             version: 1.2,
-             camera: { position: camera.position.toArray(), target: controls.target.toArray() },
+             version: 1.2, // Keep version consistent
+             // Save camera quaternion as well for free look state
+             camera: {
+                 position: camera.position.toArray(),
+                 target: controls.target.toArray(), // Still save target for orbit mode
+                 quaternion: camera.quaternion.toArray() // SAVE QUATERNION
+             },
              light: {
                  intensity: parseFloat(lightIntensitySlider.value), angle: parseFloat(lightAngleSlider.value),
                  penumbra: parseFloat(lightPenumbraSlider.value), position: spotLight.position.toArray()
@@ -2235,11 +2399,11 @@ function toggleCameraDecoupling() {
              },
              helpers: {
                  gridVisible: gridHelperToggle.checked,
-                 // axesVisible: false // No longer needed to save explicitly
              },
              ui: {
                  controlsCollapsed: document.body.classList.contains('controls-collapsed'),
-                 cameraLocked: !controls.enabled, cameraDecoupled: isCameraDecoupled
+                 cameraLocked: !controls.enabled, // Save OrbitControls enabled state
+                 cameraDecoupled: isCameraDecoupled // Save decouple state
              }
          };
 
@@ -2265,6 +2429,7 @@ function toggleCameraDecoupling() {
      let loadedState;
      try {
          loadedState = JSON.parse(savedStateJSON);
+         // Allow loading from v1.1 or 1.2 for backward compatibility if needed
          if (!loadedState || (loadedState.version !== 1.1 && loadedState.version !== 1.2)) {
               logToPage(`Saved state version mismatch or invalid. Expected 1.1 or 1.2, got ${loadedState?.version}. Ignoring.`, 'error');
               localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -2288,14 +2453,16 @@ function toggleCameraDecoupling() {
 
          // --- 1. Clear Existing Scene ---
          logToPage("Clearing current scene...");
-         selectObject(null);
+         selectObject(null); // Deselect first
          while(sceneObjects.length > 0) {
+              // Use the delete function which handles scene removal and disposal
               deleteObject(sceneObjects[sceneObjects.length - 1].uuid);
          }
          logToPage("Current scene cleared.");
 
          // --- 2. Apply Global Settings (Camera, Light, Environment, UI) ---
          logToPage("Applying global settings...");
+         // Apply camera lock state first
          controls.enabled = !loadedState.ui.cameraLocked;
          cameraLockBtn.textContent = controls.enabled ? 'Lock Camera' : 'Unlock Camera';
          if (loadedState.ui.controlsCollapsed) {
@@ -2303,16 +2470,20 @@ function toggleCameraDecoupling() {
          } else {
              document.body.classList.remove('controls-collapsed');
          }
-         toggleControls(); toggleControls();
+         toggleControls(); toggleControls(); // Refresh button text
 
-         if (loadedState.ui.cameraDecoupled !== undefined && loadedState.ui.cameraDecoupled !== isCameraDecoupled) {
-            toggleCameraDecoupling();
-         }
-
+         // Apply camera position, target, and quaternion
          camera.position.fromArray(loadedState.camera.position);
          controls.target.fromArray(loadedState.camera.target);
-         controls.update();
+         if (loadedState.camera.quaternion) { // Check if quaternion exists in save
+             camera.quaternion.fromArray(loadedState.camera.quaternion);
+         } else {
+             // Fallback if old save without quaternion: look at target
+             camera.lookAt(controls.target);
+         }
+         camera.updateProjectionMatrix(); // Ensure projection is updated
 
+         // Apply light state
          lightIntensitySlider.value = loadedState.light.intensity;
          lightAngleSlider.value = loadedState.light.angle;
          lightPenumbraSlider.value = loadedState.light.penumbra;
@@ -2323,6 +2494,7 @@ function toggleCameraDecoupling() {
          onSpotlightParamsChange();
          onLightPositionChange();
 
+         // Apply environment state
          wallHueSlider.value = loadedState.environment.wall.hue;
          wallSaturationSlider.value = loadedState.environment.wall.saturation;
          wallBrightnessSlider.value = loadedState.environment.wall.brightness;
@@ -2332,25 +2504,23 @@ function toggleCameraDecoupling() {
          onWallColorChange();
          onFloorColorChange();
 
+         // Apply helper visibility
          gridHelperToggle.checked = loadedState.helpers.gridVisible;
          gridHelper.visible = loadedState.helpers.gridVisible;
-         axesHelper.visible = loadedState.helpers.axesVisible ?? false; // Still handle potential old saves
 
          // --- 3. Recreate Objects from Saved State ---
          logToPage(`Recreating ${loadedState.sceneObjects.length} objects...`);
          let lastSelectedUUID = loadedState.selectedObjectUUID || null;
-         selectedObjectUUID = null;
+         selectedObjectUUID = null; // Reset selection before loop
 
          for (const savedObjData of loadedState.sceneObjects) {
-             // logToPage(`Recreating object: ${savedObjData.uuid} (${savedObjData.originalType})`); // Too noisy
              const result = await updateObject(savedObjData.originalType);
-
              if (!result || !result.object3D) {
-                 logToPage(`Failed to recreate object ${savedObjData.uuid}`, 'error');
+                 logToPage(`Failed to recreate object ${savedObjData.uuid} (${savedObjData.originalType})`, 'error');
                  continue;
              }
-
              const newObject = result.object3D;
+             newObject.uuid = savedObjData.uuid; // Assign SAVED UUID
              newObject.layers.set(INTERACTION_LAYER);
              newObject.traverse(child => { child.layers.set(INTERACTION_LAYER); });
 
@@ -2361,23 +2531,18 @@ function toggleCameraDecoupling() {
                    } else if (savedObjData.transform.rotation) {
                         newObject.rotation.fromArray(savedObjData.transform.rotation);
                         newObject.quaternion.setFromEuler(newObject.rotation);
-                        // logToPage(`Applied Euler rotation from older save format for ${savedObjData.uuid}`, 'info'); // Too noisy
                    }
                   newObject.scale.fromArray(savedObjData.transform.scale);
                   newObject.updateMatrixWorld(true);
              } else {
-                  logToPage(`No transform data found for ${savedObjData.uuid}, using defaults.`, 'warn');
-                   newObject.updateMatrixWorld(true);
-                  const bounds = new THREE.Box3().setFromObject(newObject, true);
-                  let baseY = 0;
-                  if (!bounds.isEmpty() && !bounds.getSize(new THREE.Vector3()).equals(new THREE.Vector3(0,0,0))) {
-                       baseY = -bounds.min.y;
-                   }
+                  logToPage(`No transform data found for ${savedObjData.uuid}, placing at base.`, 'warn');
+                  newObject.updateMatrixWorld(true);
+                  const baseY = calculateObjectBaseY(newObject);
                   newObject.position.set(0, baseY, 0);
+                  newObject.updateMatrixWorld(true);
              }
 
              if (savedObjData.material) {
-                  let appliedToMesh = false;
                   const applySavedMaterial = (material, savedMatData) => {
                       if (!material || !material.isMeshStandardMaterial || !savedMatData) return false;
                       if (savedMatData.hue !== null && savedMatData.brightness !== null && !material.map) {
@@ -2388,17 +2553,12 @@ function toggleCameraDecoupling() {
                       material.needsUpdate = true;
                       return true;
                   };
-
-                 if (newObject.isMesh) {
-                     if(applySavedMaterial(newObject.material, savedObjData.material)) appliedToMesh = true;
-                 } else if (newObject.isGroup) {
+                 if (newObject.isMesh) { applySavedMaterial(newObject.material, savedObjData.material); }
+                 else if (newObject.isGroup) {
                       newObject.traverse(child => {
                           if (child.isMesh) {
-                              if(Array.isArray(child.material)) {
-                                   child.material.forEach(m => {if(applySavedMaterial(m, savedObjData.material)) appliedToMesh = true;});
-                              } else {
-                                   if(applySavedMaterial(child.material, savedObjData.material)) appliedToMesh = true;
-                              }
+                              if(Array.isArray(child.material)) { child.material.forEach(m => applySavedMaterial(m, savedObjData.material)); }
+                              else { applySavedMaterial(child.material, savedObjData.material); }
                           }
                       });
                  }
@@ -2406,7 +2566,6 @@ function toggleCameraDecoupling() {
 
              const isActuallyPoseable = isPoseableModel(savedObjData.originalType);
              if (isActuallyPoseable && savedObjData.poseData) {
-                 // logToPage(`Applying saved pose data to ${savedObjData.uuid}`); // Too noisy
                  applyPoseData(newObject, savedObjData.poseData);
              }
 
@@ -2417,21 +2576,29 @@ function toggleCameraDecoupling() {
              });
          }
 
-         // --- 4. Restore Selection & Update UI ---
-         populateObjectList();
-         if (lastSelectedUUID && sceneObjects.some(o => o.uuid === lastSelectedUUID)) {
-             selectObject(lastSelectedUUID);
-         } else {
-             selectObject(null);
+         // --- 4. Restore Decoupling State AFTER objects loaded ---
+         // Ensure the UI button and state match the loaded value
+         if (loadedState.ui.cameraDecoupled !== isCameraDecoupled) {
+             toggleCameraDecoupling(); // Toggle to match saved state
          }
 
-         controls.update();
+         // --- 5. Restore Selection & Update UI ---
+         populateObjectList(); // Refresh the list UI first
+         controls.update(); // Update controls AFTER objects are placed and camera state restored
+
+         if (lastSelectedUUID && sceneObjects.some(o => o.uuid === lastSelectedUUID)) {
+             selectObject(lastSelectedUUID); // Reselect using the function
+         } else {
+             selectObject(null); // Deselect if previous selection is gone or wasn't set
+         }
+
          logToPage("Scene state loaded and applied successfully.", "success");
          return true;
 
      } catch (error) {
          logToPage(`Error applying loaded state: ${error.message}\n${error.stack}`, 'error');
          console.error("Apply State Error Details:", error);
+         // Attempt to reset to defaults if loading fails catastrophically
          await resetSceneToDefaults();
          return false;
      }
@@ -2443,15 +2610,21 @@ function animate() {
     try {
         requestAnimationFrame(animate);
 
-        // Only update OrbitControls if not locked
+        // Only update OrbitControls damping/pan/zoom if not locked
+        // Rotation is handled either by OrbitControls or manually in free look
         if (controls.enabled) {
-             controls.update();
+             // Only call controls.update() if NOT in free look mode,
+             // otherwise it might interfere with manual rotation.
+             if (!isCameraDecoupled) {
+                 controls.update();
+             }
         }
 
         renderer.render(scene, camera);
     }
     catch (renderError) {
          logToPage(`Animation loop error: ${renderError.message}\n${renderError.stack}`, 'error');
+         // Consider adding a flag to stop the loop if errors persist
     }
 }
 

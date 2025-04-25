@@ -1,6 +1,6 @@
-C:\!CODE\shadow_room>tree /f
-Folder PATH listing
-C:.
+shadow_room
+
+
 ¦   .gitignore
 ¦   changelog.systemprompt.txt
 ¦   directory_structure.txt
