@@ -31,6 +31,7 @@ body {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
+    position: relative; /* Needed for absolute positioning of debug panel */
 }
 
 /* --- Top Controls Bar (#controls) --- */
@@ -86,198 +87,98 @@ body {
     justify-content: center; /* Horizontal center */
     text-align: center; /* Text align center */
 }
-#controls button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-#controls button:hover:not(:disabled) {
-    background: #666;
-}
+#controls button:disabled { opacity: 0.6; cursor: not-allowed; }
+#controls button:hover:not(:disabled) { background: #666; }
 /* Style for active transform button */
-#controls button.transform-btn.active {
-     background-color: #004a99; /* Use selection color */
-     border-color: #77aaff;
-     font-weight: bold;
-}
+#controls button.transform-btn.active { background-color: #004a99; border-color: #77aaff; font-weight: bold; }
 
 
-#transformModeControls {
-     /* Styles inherited from .controls-group */
-}
-#transformModeControls button {
-    padding: 6px 10px;
-    font-size: 0.95em;
-}
+#transformModeControls {}
+#transformModeControls button { padding: 6px 10px; font-size: 0.95em; }
 
+/* Debug Toggle Button */
+#toggleDebugBtn {
+    padding: 4px 8px; font-size: 0.9em;
+    min-width: 30px; min-height: 30px;
+    font-weight: bold; margin-left: auto;
+}
 
 /* --- Middle Canvas Container (#container) --- */
-#container {
-    flex: 1 1 auto;
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-    background: #232323;
-    min-width: 0;
-    min-height: 0;
-}
-
-canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 1;
-    background: #232323;
-}
+#container { flex: 1 1 auto; position: relative; width: 100%; overflow: hidden; background: #232323; min-width: 0; min-height: 0; }
+canvas { display: block; width: 100%; height: 100%; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; background: #232323; }
 
 /* --- Top-Left Info Text (#info) --- */
-#info {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: rgba(40,40,40,0.92);
-    color: #fff;
-    padding: 6px 11px;
-    border-radius: 5px;
-    font-size: 1em;
-    z-index: 25;
-    pointer-events: none;
-    max-width: calc(100% - 16px);
-}
-#info.error { color: #ff8080; }
-#info.success { color: #80ff80; }
-#info.loading { color: #ffe080; }
+#info { position: absolute; top: 8px; left: 8px; background: rgba(40,40,40,0.92); color: #fff; padding: 6px 11px; border-radius: 5px; font-size: 1em; z-index: 25; pointer-events: none; max-width: calc(100% - 16px); }
+#info.error { color: #ff8080; } #info.success { color: #80ff80; } #info.loading { color: #ffe080; }
 
 /* --- Components Panel (#componentsInfo) --- */
 /* Default: Desktop/Landscape - Absolute Overlay */
-#componentsInfo {
-    position: absolute;
-    right: 12px;
-    top: 15px;
-    background: rgba(30,30,30,0.98);
-    color: #fff;
-    padding: 15px 12px 15px 14px;
-    border-radius: 8px;
-    font-size: 1.05em; /* Base desktop font size */
-    width: auto;
-    max-width: 420px;
-    height: auto;
-    max-height: calc(100vh - 30px - 85px); /* Adjusted calculation slightly for potentially wrapped controls */
-    overflow-y: auto;
-    z-index: 30;
-    box-shadow: 0 2px 16px #000a;
-    box-sizing: border-box;
-    -webkit-overflow-scrolling: touch;
-    display: block;
-}
+#componentsInfo { position: absolute; right: 12px; top: 15px; background: rgba(30,30,30,0.98); color: #fff; padding: 15px 12px 15px 14px; border-radius: 8px; font-size: 1.05em; width: auto; max-width: 420px; height: auto; max-height: calc(100vh - 30px - 85px); overflow-y: auto; z-index: 30; box-shadow: 0 2px 16px #000a; box-sizing: border-box; -webkit-overflow-scrolling: touch; display: block; }
+#componentsInfo h3, #componentsInfo h4, #componentsInfo summary { font-size: 1.1em; color: #c080ff; margin: 8px 0 4px 0; }
+#componentsInfo ul { margin: 0 0 8px 16px; padding: 0; font-size: 1em; }
+#componentsInfo li { margin-bottom: 3px; font-size: 1em; padding: 3px 5px; cursor: pointer; border-radius: 3px; display: block; text-align: left; }
+#boneListContainer li.selected { background: #004a99; color: #fff; font-weight: bold; }
+details > summary { cursor: pointer; padding: 3px 0; font-weight: 500; }
+details[open] > summary { font-weight: bold; margin-bottom: 4px; }
 
-#componentsInfo h3, #componentsInfo h4, #componentsInfo summary {
-    font-size: 1.1em; /* Relative */
-    color: #c080ff;
-    margin: 8px 0 4px 0;
+/* --- >>> DEBUG PANEL STYLES <<< --- */
+#debugPanel {
+    position: absolute; bottom: 10px; left: 10px;
+    width: auto; max-width: 450px; max-height: 60vh;
+    background-color: rgba(20, 20, 30, 0.95); /* Slightly more opaque */
+    color: #ccc; border: 1px solid #556; border-radius: 6px;
+    padding: 10px 15px; overflow-y: auto; z-index: 40;
+    font-family: monospace; font-size: 0.8em; line-height: 1.3;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
-#componentsInfo ul {
-    margin: 0 0 8px 16px;
-    padding: 0;
-    font-size: 1em; /* Relative */
+#debugPanel .debug-header { /* Style the header area */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #445;
 }
-#componentsInfo li {
-    margin-bottom: 3px;
-    font-size: 1em; /* Relative */
-    padding: 3px 5px;
-    cursor: pointer;
-    border-radius: 3px;
-    /* Remove centering for desktop view */
-    display: block;
-    text-align: left;
+#debugPanel h3 {
+    margin: 0; padding: 0; border: none; /* Remove default h3 border */
+    color: #99aaff; font-size: 1.1em; text-align: left;
 }
-#boneListContainer li.selected {
-    background: #004a99;
-    color: #fff;
-    font-weight: bold;
+#saveDebugDataBtn { /* Style the save button */
+    padding: 3px 8px;
+    font-size: 0.9em; /* Smaller font for this button */
+    min-height: 24px; /* Smaller height */
+    min-width: auto;
+    background-color: #556; /* Different bg */
+    border-color: #778;
+    color: #eee;
+    margin-left: 10px; /* Space from title */
 }
+#saveDebugDataBtn:hover { background-color: #778; }
 
-details > summary {
-    cursor: pointer;
-    padding: 3px 0;
-    font-weight: 500;
-}
-details[open] > summary {
-    font-weight: bold;
-    margin-bottom: 4px;
-}
+#debugPanel details { margin-bottom: 3px; }
+#debugPanel summary { cursor: pointer; font-weight: bold; color: #aaa; padding: 1px 0; }
+#debugPanel details[open] > summary { color: #ddd; margin-bottom: 3px; }
+#debugPanel ul { list-style: none; padding-left: 15px; margin: 0; }
+#debugPanel li { margin-bottom: 4px; padding: 2px 0; border-bottom: 1px dashed #444; }
+#debugPanel li:last-child { border-bottom: none; }
+#debugPanel .bone-name { color: #ffa; font-weight: bold; display: block; margin-bottom: 2px; }
+#debugPanel .transform-label { color: #88ddaa; display: inline-block; width: 35px; }
+#debugPanel .transform-data { color: #ffccaa; white-space: pre; }
+/* --- >>> END DEBUG PANEL STYLES <<< --- */
 
 
 /* --- Responsive: Mobile/Portrait --- */
-/* Apply bottom-docked style for #componentsInfo */
 @media (max-width: 767px), (orientation: portrait) {
-
-    #container {
-        flex: 1 1 auto;
-        min-height: 0;
-    }
-
-    #componentsInfo {
-        /* Override to Dock at Bottom */
-        position: relative;
-        order: 3;
-        width: 100%;
-        max-width: none;
-        height: auto;
-        max-height: 45vh; /* Max height */
-        border-top: 1px solid #444;
-        border-radius: 0;
-        box-shadow: none;
-        background: #282828;
-        z-index: 15;
-        flex-shrink: 0;
-        padding: 12px 14px 12px 16px;
-        top: auto;
-        right: auto;
-
-        /* <<< Mobile Font Size Adjustments >>> */
-        font-size: 1.2em; /* Significantly larger base font */
-    }
-
-    #componentsInfo h3, #componentsInfo h4, #componentsInfo summary {
-        font-size: 1.15em; /* Larger headings */
-        margin: 10px 0 5px 0;
-    }
-    #componentsInfo ul {
-        margin: 0 0 10px 18px;
-        font-size: 1.1em; /* Larger list font */
-    }
-     #componentsInfo li {
-        padding: 7px 10px; /* Increased padding for touch */
-        margin-bottom: 5px; /* Increase spacing */
-        font-size: 1.1em; /* Larger list item text */
-        /* <<< Centering List Item Text >>> */
-        display: flex; /* Use flex for centering */
-        justify-content: center; /* Center horizontally */
-        align-items: center; /* Center vertically */
-        text-align: center; /* Ensure text is centered */
-        min-height: 36px; /* Ensure minimum touch height */
-     }
-     /* Keep selection style */
-     #boneListContainer li.selected {
-         /* (style defined globally) */
-     }
-
-     /* Adjust top controls touch targets for mobile */
-    #controls {
-         padding: 6px 10px;
-         gap: 6px 12px;
-     }
-    #controls button, #controls select {
-        min-width: 44px; /* Larger touch target */
-        min-height: 44px;
-        padding: 9px 13px;
-        font-size: 1.05em;
-     }
-      #transformModeControls button {
-        padding: 8px 11px;
-     }
+    #container { flex: 1 1 auto; min-height: 0; }
+    #componentsInfo { position: relative; order: 3; width: 100%; max-width: none; height: auto; max-height: 45vh; border-top: 1px solid #444; border-radius: 0; box-shadow: none; background: #282828; z-index: 15; flex-shrink: 0; padding: 12px 14px 12px 16px; top: auto; right: auto; font-size: 1.2em; }
+    #componentsInfo h3, #componentsInfo h4, #componentsInfo summary { font-size: 1.15em; margin: 10px 0 5px 0; }
+    #componentsInfo ul { margin: 0 0 10px 18px; font-size: 1.1em; }
+    #componentsInfo li { padding: 7px 10px; margin-bottom: 5px; font-size: 1.1em; display: flex; justify-content: center; align-items: center; text-align: center; min-height: 36px; }
+    #controls { padding: 6px 10px; gap: 6px 12px; }
+    #controls button, #controls select { min-width: 44px; min-height: 44px; padding: 9px 13px; font-size: 1.05em; }
+    #transformModeControls button { padding: 8px 11px; }
+    #debugPanel { width: 95vw; max-width: 95vw; left: 2.5vw; bottom: 5px; max-height: 30vh; font-size: 0.75em; }
+    #saveDebugDataBtn { padding: 2px 6px; font-size: 0.8em; }
 }
 
 /* END OF FILE poser_style.css */
